@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Acessórios e Consumo - Grupo Libraga Brandão</title>
+    
+    <!-- Bibliotecas Tailwind CSS, SheetJS (Excel) e jsPDF (PDF) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- FIREBASE SDK (Sincronização em Tempo Real) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- LEITOR E GERADOR DE QR CODE / CÓDIGO DE BARRAS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        .sidebar-bg { background-color: #0b1120; }
+        .sidebar-text { color: #94a3b8; }
+        .sidebar-hover:hover { background-color: #1e293b; color: #ffffff; }
+        
+        /* CSS para Impressão do QR Code */
+        @media print {
+            body * { visibility: hidden; }
+            #modal-qrcode-content, #modal-qrcode-content * { visibility: visible; color: black !important; }
+            #modal-qrcode-content { 
+                position: absolute; left: 0; top: 0; margin: 0; padding: 20px; 
+                width: auto; box-shadow: none; border: none; background: white;
+            }
+            .no-print { display: none !important; }
+            html.dark { background-color: white !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-[#0f172a] font-sans text-gray-800 dark:text-slate-200 overflow-hidden transition-colors duration-300">
+
+    <!-- DATALIST PARA SUGESTÕES DE PRODUTOS -->
+    <datalist id="lista-sugestoes-produtos"></datalist>
+
+    <!-- ================= TELA DO SISTEMA ================= -->
+    <div id="tela-sistema" class="h-screen flex flex-col md:flex-row relative overflow-hidden">
+        
+        <!-- HEADER MOBILE -->
+        <header class="md:hidden w-full bg-[#0b1120] text-slate-300 px-4 py-3 flex items-center justify-between border-b border-slate-800 shadow-md z-30">
+            <div class="text-xs font-black tracking-tight flex flex-col">
+                <span class="text-[9px] text-gray-400 font-semibold leading-none">GRUPO</span>
+                <span class="text-red-500 font-extrabold text-sm leading-none mt-1">LIBRAGA BRANDÃO</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="badge-perfil-mobile" class="text-[9px] bg-blue-600 px-2 py-0.5 rounded uppercase font-bold text-white">Admin</span>
+                <button onclick="toggleMenuMobile()" class="p-1 focus:outline-none text-slate-300 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="hamburger-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- MENU LATERAL -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 w-64 sidebar-bg text-slate-300 flex flex-col transition-transform duration-300 ease-in-out border-r border-slate-800 shadow-xl z-40 h-full pt-[52px] md:pt-0">
+            <div class="hidden md:flex p-5 border-b border-slate-800 flex-col items-start gap-1 bg-[#080d1a]">
+                <div class="text-sm font-black tracking-tight select-none flex flex-col">
+                    <span class="text-xs text-gray-400 font-semibold leading-none">GRUPO</span>
+                    <span class="text-red-500 font-extrabold text-base leading-none mt-1">LIBRAGA BRANDÃO</span>
+                </div>
+                <div class="flex justify-between items-center w-full mt-2">
+                    <span id="badge-perfil" class="text-[9px] bg-blue-600 px-2 py-0.5 rounded uppercase tracking-wider text-white font-bold">Admin</span>
+                    <span class="flex items-center text-[10px] text-green-400 font-bold"><span class="w-2 h-2 rounded-full bg-green-400 mr-1 animate-pulse" id="status-conexao-indicador"></span><span id="status-conexao-texto">Online</span></span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto sidebar-text text-sm font-medium">
+                <button id="menu-dashboard" onclick="mostrarAba('dashboard', this)" class="menu-item flex items-center w-full p-3 rounded-lg bg-blue-500 text-white transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    Painel de controle
+                </button>
+                <button onclick="mostrarAba('lista', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    Itens / Acessórios
+                </button>
+                <button onclick="mostrarAba('lojas', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    Lojas / Setores
+                </button>
+                <button onclick="mostrarAba('estoque', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    Estoque Consolidado
+                </button>
+                <button onclick="mostrarAba('movimentacao', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    Movimentações (Carrinho)
+                </button>
+                <button onclick="mostrarAba('historico', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Histórico Geral
+                </button>
+                <button onclick="mostrarAba('relatorios', this)" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Relatórios por Local
+                </button>
+
+                <div class="my-4 border-t border-slate-800"></div>
+
+                <input type="file" id="input-planilha" accept=".xlsx, .xls, .csv" class="hidden" onchange="processarPlanilha(event)">
+                <button id="menu-importar" onclick="acionarImportacao()" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Importar Planilha
+                </button>
+                <button onclick="exportarCSV()" class="menu-item flex items-center w-full p-3 rounded-lg sidebar-hover transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Exportar Base Completa
+                </button>
+
+                <!-- BOTÃO DE INSTALAÇÃO PWA -->
+                <button id="btn-install-pwa" class="hidden items-center w-full p-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold transition-colors mt-2 shadow-md">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4"></path></svg>
+                    Instalar App (PWA)
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800 bg-[#080d1a] flex flex-col gap-2">
+                <button onclick="alternarTema()" class="w-full flex items-center justify-center p-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors">
+                    <svg id="icone-sol" class="w-5 h-5 hidden mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <svg id="icone-lua" class="w-5 h-5 mr-2 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    <span id="texto-tema" class="text-sm font-medium">Modo Escuro</span>
+                </button>
+                <p class="text-xs text-slate-400 mt-2">Sessão: <br><b id="nome-usuario" class="text-white text-sm">Administrador</b></p>
+            </div>
+        </aside>
+
+        <div id="sidebar-overlay" onclick="toggleMenuMobile()" class="hidden fixed inset-0 bg-black/50 z-35 transition-opacity md:hidden"></div>
+
+        <!-- ÁREA PRINCIPAL -->
+        <main id="main-content" class="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto h-full bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 relative">
+            
+            <!-- ABA: DASHBOARD -->
+            <div id="aba-dashboard" class="aba-conteudo">
+                <h2 class="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-gray-800 dark:text-white">Painel de Controle</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div class="bg-white dark:bg-[#0b1120] p-5 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 border-l-4 border-l-blue-500">
+                        <h3 class="text-gray-500 dark:text-slate-400 text-xs sm:text-sm font-bold uppercase tracking-wide">Tipos de Itens Cadastrados</h3>
+                        <p id="dash-total" class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white mt-1 sm:mt-2">0</p>
+                    </div>
+                    <div class="bg-white dark:bg-[#0b1120] p-5 sm:p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 border-l-4 border-l-purple-500">
+                        <h3 class="text-gray-500 dark:text-slate-400 text-xs sm:text-sm font-bold uppercase tracking-wide">Locais / Lojas / Setores</h3>
+                        <p id="dash-lojas" class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white mt-1 sm:mt-2">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: CADASTRO -->
+            <div id="aba-cadastro" class="aba-conteudo hidden">
+                <div class="flex items-center mb-6">
+                    <button onclick="mostrarAba('lista')" class="mr-4 text-gray-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    </button>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">Adicionar Novo Item</h2>
+                </div>
+                <form id="form-cadastro" onsubmit="salvarMaterial(event)" class="bg-white dark:bg-[#0b1120] p-5 sm:p-8 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 max-w-3xl">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Código ou Nome (Opcional)</label>
+                            <div class="relative flex gap-2">
+                                <div class="relative flex-1">
+                                    <input type="text" id="codigo" list="lista-sugestoes-produtos" oninput="buscarMaterialCadastro()" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase transition-colors" placeholder="Ex: TEC-001 ou Teclado...">
+                                </div>
+                                <button type="button" onclick="abrirScanner('codigo')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg flex items-center justify-center transition shadow" title="Escanear Código com Câmera">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                </button>
+                            </div>
+                            <p id="info-qtd-existente" class="text-[11px] sm:text-xs font-bold mt-2 text-indigo-600 dark:text-indigo-400 hidden"></p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Descrição / Nome do Item *</label>
+                            <input type="text" id="descricao" required class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors" placeholder="Ex: Teclado USB Logitech, Mouse Sem Fio...">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Destino / Localização</label>
+                            <select id="loja" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                <!-- Preenchido dinamicamente via JS -->
+                            </select>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-1">
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Und. *</label>
+                                <select id="und-cadastro" required class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors font-semibold">
+                                    <option value="UN">UN</option>
+                                    <option value="CX">CX</option>
+                                    <option value="PC">PC</option>
+                                    <option value="RL">RL</option>
+                                    <option value="MT">MT</option>
+                                    <option value="KG">KG</option>
+                                    <option value="L">L</option>
+                                    <option value="PR">PR</option>
+                                    <option value="CJ">CJ</option>
+                                </select>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Quantidade (Ex: 2*5) *</label>
+                                <input type="text" id="qtd" value="1" required onblur="calcularExpressaoMath(this)" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: 10 ou 5*12">
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5 sm:mb-2">Observação do Item (Opcional)</label>
+                            <input type="text" id="obs-cadastro" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors" placeholder="Ex: Número de série, produto com defeito, detalhes adicionais...">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 sm:py-3 px-8 rounded-lg transition shadow-sm">
+                        Registrar Entrada no Estoque
+                    </button>
+                    <div id="msg-sucesso" class="text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-4 rounded-lg font-bold mt-4 hidden border border-green-200 dark:border-green-800/50 text-sm">
+                        ✅ Item registrado com sucesso! Você pode imprimir o QR Code na aba de Itens.
+                    </div>
+                </form>
+            </div>
+
+            <!-- ABA: LISTA DE MATERIAIS -->
+            <div id="aba-lista" class="aba-conteudo hidden h-full flex flex-col">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">Itens em Estoque (Detalhado)</h2>
+                    
+                    <div class="flex flex-row flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+                        <button onclick="exportarListaFiltradaCSV()" class="flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow-sm">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Exportar CSV
+                        </button>
+                        <button onclick="exportarListaFiltradaPDF()" class="flex-1 sm:flex-none justify-center bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow border border-red-800">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            Exportar PDF
+                        </button>
+                        <button id="btn-novo-produto" onclick="abrirCadastroProduto()" class="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-sm text-sm flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Entrada
+                        </button>
+                        <button id="btn-excluir-lote" onclick="excluirSelecionados()" class="flex-1 sm:flex-none justify-center bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 font-bold py-2 px-4 rounded-lg transition shadow-sm text-sm border border-red-200 dark:border-red-800/50 flex items-center">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Excluir
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FILTROS AVANÇADOS DA LISTA -->
+                <div class="bg-white dark:bg-[#0b1120] p-4 rounded-xl border border-gray-200 dark:border-slate-800 mb-6 flex flex-col gap-4 shadow-sm transition-colors">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Filtrar por Local / Loja</label>
+                            <select id="filtro-loja-lista" onchange="mudarPaginaProdutos(1)" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-semibold cursor-pointer transition-colors">
+                                <option value="TODAS">-- Todos os Locais --</option>
+                                <!-- Preenchido via JS -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Filtrar por Produto (Código ou Nome)</label>
+                            <div class="relative w-full">
+                                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                    <svg class="w-4 h-4 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+                                <input type="text" id="busca-produto-lista" oninput="mudarPaginaProdutos(1)" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg pl-10 p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none transition-colors" placeholder="Buscar vários? Separe por vírgulas...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-[#0b1120] rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden flex-1 flex flex-col h-0">
+                    <div class="overflow-auto flex-1">
+                        <table class="w-full text-left border-collapse min-w-[600px] md:min-w-0">
+                            <thead class="bg-slate-50 dark:bg-[#0f172a] sticky top-0 z-10">
+                                <tr class="text-slate-500 dark:text-slate-300 uppercase text-xs tracking-wider border-b border-gray-100 dark:border-slate-700">
+                                    <th class="p-4 w-10 text-center">
+                                        <input type="checkbox" id="chk-todos" onclick="toggleTodos(this)" class="cursor-pointer w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-slate-600 focus:ring-blue-500 bg-white dark:bg-[#0f172a]">
+                                    </th>
+                                    <th class="p-4 text-xs font-bold">Código / SKU</th>
+                                    <th class="p-4 text-xs font-bold">Item / Acessório</th>
+                                    <th class="p-4 text-xs font-bold">Local Atual</th>
+                                    <th class="p-4 text-xs font-bold text-center">Qtde. Disp.</th>
+                                    <th class="p-4 text-center text-xs font-bold">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-bens" class="text-sm dark:text-slate-200 divide-y border-gray-100 dark:border-slate-800"></tbody>
+                        </table>
+                    </div>
+                    <!-- Rodapé Paginação -->
+                    <div class="p-3 sm:p-4 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs sm:text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-transparent">
+                        <span id="produtos-total-registros">0 iten(s)</span>
+                        <div class="flex space-x-1" id="produtos-paginacao"></div>
+                        <span id="produtos-info-pagina">Página 1 de 1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: LOJAS -->
+            <div id="aba-lojas" class="aba-conteudo hidden h-full flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start mb-6 gap-3">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-1">Locais / Lojas / Setores</h2>
+                        <p class="text-xs sm:text-sm text-gray-500 dark:text-slate-400">Gerencie os locais onde os itens podem ser alocados.</p>
+                    </div>
+                    <button id="btn-nova-loja" onclick="abrirModalNovaLoja()" class="w-full sm:w-auto justify-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center transition text-sm shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Novo Local
+                    </button>
+                </div>
+
+                <div class="mb-4">
+                    <div class="relative w-full md:w-80">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <svg class="w-4 h-4 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <input type="text" id="busca-lojas" oninput="buscarLojas()" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg pl-10 p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none transition-colors" placeholder="Pesquisar local...">
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-[#0b1120] rounded-lg border border-gray-200 dark:border-slate-800 flex-1 flex flex-col overflow-hidden shadow-sm h-0">
+                    <div class="overflow-auto flex-1">
+                        <table class="w-full text-left border-collapse text-sm min-w-[500px] md:min-w-0">
+                            <thead class="bg-slate-50 dark:bg-[#0f172a] sticky top-0 z-10">
+                                <tr class="text-gray-500 dark:text-slate-400 font-semibold border-b border-gray-200 dark:border-slate-800 text-xs uppercase">
+                                    <th class="p-4">Nome do Local / Loja <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Cidade <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Estado <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Variedade de Itens <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Status <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-lojas" class="text-gray-700 dark:text-slate-200 divide-y border-gray-100 dark:border-slate-800 dark:divide-slate-800"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs sm:text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-[#0b1120]">
+                        <span id="lojas-total-registros">0 registro(s)</span>
+                        <div class="flex space-x-1" id="lojas-paginacao"></div>
+                        <span id="lojas-info-pagina">Página 1 de 1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: ESTOQUE GERAL -->
+            <div id="aba-estoque" class="aba-conteudo hidden h-full flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-start mb-6 gap-3">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-1">Estoque Consolidado Geral</h2>
+                        <p class="text-xs sm:text-sm text-gray-500 dark:text-slate-400">Soma e visão geral de todas as quantidades de itens na empresa</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button onclick="exportarEstoqueCSV()" class="flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow-sm">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Exportar CSV
+                        </button>
+                        <button onclick="exportarEstoquePDF()" class="flex-1 sm:flex-none justify-center bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow border border-red-800">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            Exportar PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FILTROS AVANÇADOS ESTOQUE -->
+                <div class="bg-white dark:bg-[#0b1120] p-4 rounded-xl border border-gray-200 dark:border-slate-800 mb-6 flex flex-col gap-4 shadow-sm transition-colors">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Filtrar por Local / Loja</label>
+                            <select id="filtro-loja-estoque" onchange="buscarEstoque()" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-semibold cursor-pointer transition-colors">
+                                <option value="TODAS">-- Todas as Lojas / Locais --</option>
+                                <!-- Preenchido via JS -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Filtrar por Produto (Código ou Nome)</label>
+                            <div class="relative w-full">
+                                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                    <svg class="w-4 h-4 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+                                <input type="text" id="busca-estoque" oninput="buscarEstoque()" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg pl-10 p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none transition-colors" placeholder="Buscar vários? Separe por vírgulas...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-[#0b1120] rounded-lg border border-gray-200 dark:border-slate-800 flex-1 flex flex-col overflow-hidden shadow-sm h-0">
+                    <div class="overflow-auto flex-1">
+                        <table class="w-full text-left border-collapse text-sm min-w-[500px] md:min-w-0">
+                            <thead class="bg-slate-50 dark:bg-[#0f172a] sticky top-0 z-10">
+                                <tr class="text-gray-500 dark:text-slate-400 font-semibold border-b border-gray-200 dark:border-slate-800 text-xs uppercase">
+                                    <th class="p-4">Código / SKU <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Item / Acessório / Consumo <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4 text-center">Quantidade Total Consolidada <span class="text-[10px] ml-1">↑↓</span></th>
+                                    <th class="p-4">Status Geral <span class="text-[10px] ml-1">↑↓</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-estoque" class="text-gray-700 dark:text-slate-200 divide-y border-gray-100 dark:border-slate-800 dark:divide-slate-800"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs sm:text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-[#0b1120]">
+                        <span id="estoque-total-registros">0 iten(s)</span>
+                        <div class="flex space-x-1" id="estoque-paginacao"></div>
+                        <span id="estoque-info-pagina">Página 1 de 1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: MOVIMENTAÇÃO EM LOTE (CARRINHO) -->
+            <div id="aba-movimentacao" class="aba-conteudo hidden h-full flex flex-col">
+                <h2 class="text-2xl sm:text-3xl font-bold mb-4 text-gray-800 dark:text-white">Movimentações em Lote (Carrinho)</h2>
+                
+                <div class="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
+                    <!-- PAINEL 1: ADICIONAR ITEM AO CARRINHO -->
+                    <div class="w-full lg:w-1/3 bg-white dark:bg-[#0b1120] p-5 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col h-auto lg:h-full">
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 dark:border-slate-700">1. Adicionar Item</h3>
+                        
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Código ou Nome do Item:</label>
+                            <div class="relative flex gap-2">
+                                <div class="relative flex-1">
+                                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    </div>
+                                    <input type="text" id="mov-codigo" list="lista-sugestoes-produtos" oninput="buscarDadosMaterialParaCarrinho()" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-blue-700 dark:text-blue-400 p-2.5 pl-9 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-semibold text-sm transition-colors" placeholder="Ex: TEC-1234 ou Mouse...">
+                                </div>
+                                <button type="button" onclick="abrirScanner('mov-codigo')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded-lg flex items-center justify-center transition shadow" title="Escanear com Câmera">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                                </button>
+                            </div>
+                            <p id="mov-produto-desc" class="text-[11px] sm:text-xs font-bold mt-2 min-h-[16px] text-gray-500 dark:text-slate-400">Aguardando Código...</p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Origem (Retirar de):</label>
+                            <select id="mov-origem" disabled onchange="atualizarMaxQtdCarrinho()" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-sm">
+                                <option value="">-- Aguardando --</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Quantidade (Permite ex: 2*5):</label>
+                            <input type="text" id="mov-qtd" value="1" onblur="calcularExpressaoMath(this)" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-sm">
+                        </div>
+
+                        <button type="button" id="btn-add-carrinho" onclick="adicionarAoCarrinho()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg transition shadow-sm opacity-50 cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Adicionar à Lista
+                        </button>
+                    </div>
+
+                    <!-- PAINEL 2: CARRINHO E CONFIRMAÇÃO -->
+                    <div class="w-full lg:w-2/3 bg-white dark:bg-[#0b1120] p-5 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col h-[500px] lg:h-full">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2 dark:border-slate-700">
+                            <h3 class="text-lg font-bold text-gray-800 dark:text-white">2. Lista de Movimentação (<span id="cart-count">0</span> itens)</h3>
+                        </div>
+
+                        <!-- Tabela do Carrinho -->
+                        <div class="flex-1 overflow-auto border rounded-lg border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-[#0f172a] mb-4">
+                            <table class="w-full text-left text-sm min-w-[450px]">
+                                <thead class="bg-gray-100 dark:bg-slate-800 sticky top-0 z-10">
+                                    <tr class="text-gray-500 dark:text-slate-300 uppercase text-[10px] tracking-wider border-b border-gray-200 dark:border-slate-700">
+                                        <th class="p-3">Código</th>
+                                        <th class="p-3">Item</th>
+                                        <th class="p-3">Origem</th>
+                                        <th class="p-3 text-center">Qtd</th>
+                                        <th class="p-3 text-center">Remover</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-carrinho" class="text-gray-700 dark:text-slate-200 divide-y border-gray-100 dark:border-slate-700">
+                                    <tr><td colspan="5" class="p-6 text-center text-gray-400 italic">Lista vazia. Adicione itens para continuar.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Configurações do Lote (Abaixo da Tabela) -->
+                        <div class="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg border border-gray-200 dark:border-slate-700 mb-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Destino (Obrigatório para Transferência)</label>
+                                    <select id="lote-destino" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 rounded focus:ring-1 focus:ring-blue-500 outline-none transition-colors text-xs font-semibold">
+                                        <!-- Preenchido via JS -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Motivo Geral / Observação</label>
+                                    <input type="text" id="lote-obs" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white p-2.5 rounded focus:ring-1 focus:ring-blue-500 outline-none transition-colors text-xs" placeholder="Ex: Baixa semanal, Envio para filial X">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões Finais -->
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button type="button" id="btn-lote-transf" onclick="processarLote('TRANSFERENCIA')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow opacity-50 cursor-not-allowed text-sm" disabled>
+                                Transferir Lote
+                            </button>
+                            <button type="button" id="btn-lote-consumo" onclick="processarLote('CONSUMO_IMEDIATO')" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition shadow opacity-50 cursor-not-allowed text-sm" disabled>
+                                Enviar p/ Uso Imediato
+                            </button>
+                            <button type="button" id="btn-lote-baixa" onclick="processarLote('BAIXA')" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg transition shadow opacity-50 cursor-not-allowed text-sm" disabled>
+                                Dar Baixa (Descarte)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: RELATÓRIOS (POR LOJA) -->
+            <div id="aba-relatorios" class="aba-conteudo hidden h-full flex flex-col">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-1">Relatórios por Local</h2>
+                        <p class="text-xs sm:text-sm text-gray-500 dark:text-slate-400">Filtre e exporte os itens individuais de cada filial/setor em CSV ou PDF.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button onclick="exportarRelatorioAtual()" class="flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow-sm">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span id="btn-exportar-texto">CSV (Todos)</span>
+                        </button>
+                        <button onclick="exportarRelatorioAtualPDF()" class="flex-1 sm:flex-none justify-center bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 sm:px-4 rounded-lg flex items-center transition text-xs sm:text-sm shadow border border-red-800">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            <span id="btn-exportar-pdf-texto">PDF (Todos)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtro -->
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">Selecione o Local / Filial</label>
+                    <select id="relatorio-loja-select" onchange="renderizarRelatorios()" class="w-full md:w-96 bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-semibold cursor-pointer transition-colors">
+                        <!-- Preenchido via JS -->
+                    </select>
+                </div>
+
+                <!-- Lista de Relatórios -->
+                <div id="container-relatorios" class="flex-1 overflow-y-auto space-y-6 pb-6 pr-1">
+                    <!-- Preenchido via JavaScript -->
+                </div>
+            </div>
+
+            <!-- ABA: HISTÓRICO GERAL E FILTROS -->
+            <div id="aba-historico" class="aba-conteudo hidden h-full flex flex-col">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-1">Histórico de Movimentações</h2>
+                        <p class="text-xs sm:text-sm text-gray-500 dark:text-slate-400">Auditoria de transferências, baixas e importações</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <button id="btn-excluir-historico-lote" onclick="excluirHistoricoSelecionados()" class="flex-1 sm:flex-none justify-center bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-200 font-bold py-2 px-3 sm:px-4 rounded-lg transition shadow border border-red-200 dark:border-red-800/50 flex items-center text-xs sm:text-sm">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Apagar Seleção
+                        </button>
+                        
+                        <button id="btn-limpar-historico" onclick="limparTodoHistorico()" class="flex-1 sm:flex-none justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 sm:px-4 rounded-lg transition shadow flex items-center text-xs sm:text-sm">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Limpar Tudo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BARRA DE FILTROS DO HISTÓRICO -->
+                <div class="bg-white dark:bg-[#0b1120] p-4 rounded-xl border border-gray-200 dark:border-slate-800 mb-6 flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between shadow-sm transition-colors">
+                    <div class="flex flex-row gap-2 w-full md:w-auto">
+                        <div class="flex-1 md:flex-initial">
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1">Mês</label>
+                            <select id="filtro-mes-historico" onchange="mudarPaginaHistorico(1)" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg p-2 text-xs sm:text-sm focus:ring-1 focus:ring-blue-500 outline-none md:w-40 font-semibold cursor-pointer transition-colors h-[38px]">
+                                <option value="">Todos</option>
+                                <option value="01">Janeiro</option>
+                                <option value="02">Fevereiro</option>
+                                <option value="03">Março</option>
+                                <option value="04">Abril</option>
+                                <option value="05">Maio</option>
+                                <option value="06">Junho</option>
+                                <option value="07">Julho</option>
+                                <option value="08">Agosto</option>
+                                <option value="09">Setembro</option>
+                                <option value="10">Outubro</option>
+                                <option value="11">Novembro</option>
+                                <option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 md:flex-initial">
+                            <label class="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1">Ano</label>
+                            <select id="filtro-ano-historico" onchange="mudarPaginaHistorico(1)" class="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded-lg p-2 text-xs sm:text-sm focus:ring-1 focus:ring-blue-500 outline-none md:w-32 font-semibold cursor-pointer transition-colors h-[38px]">
+                                <option value="">Todos</option>
+                                <!-- Preenchido dinamicamente via JS -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button onclick="exportarHistoricoCSV()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-3 sm:px-4 rounded-lg flex items-center justify-center transition text-xs sm:text-sm flex-1 md:flex-none shadow-sm h-[38px]">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            CSV
+                        </button>
+                        <button onclick="exportarHistoricoPDF()" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-3 sm:px-4 rounded-lg flex items-center justify-center transition text-xs sm:text-sm border border-red-800 flex-1 md:flex-none shadow h-[38px]">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-[#0b1120] rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden flex-1 flex flex-col transition-colors h-0">
+                    <div class="overflow-auto flex-1">
+                        <table class="w-full text-left border-collapse text-sm min-w-[650px] md:min-w-0">
+                            <thead class="bg-slate-50 dark:bg-[#0f172a] sticky top-0 transition-colors z-10">
+                                <tr class="text-gray-500 dark:text-slate-400 uppercase text-xs tracking-wider border-b border-gray-100 dark:border-slate-800">
+                                    <th class="p-4 w-10 text-center">
+                                        <input type="checkbox" id="chk-todos-historico" onclick="toggleTodosHistorico(this)" class="cursor-pointer w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-[#0f172a] focus:ring-blue-500">
+                                    </th>
+                                    <th class="p-4">Data / Hora</th>
+                                    <th class="p-4">Código (Qtd)</th>
+                                    <th class="p-4">De (Origem)</th>
+                                    <th class="p-4">Para (Destino)</th>
+                                    <th class="p-4">Observação / Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-historico" class="text-gray-700 dark:text-slate-200 divide-y border-gray-100 dark:border-slate-800 dark:divide-slate-800"></tbody>
+                        </table>
+                    </div>
+                    <!-- Rodapé Paginação -->
+                    <div class="p-3 sm:p-4 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs sm:text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-[#0b1120] transition-colors">
+                        <span id="historico-total-registros">0 registro(s)</span>
+                        <div class="flex space-x-1" id="historico-paginacao"></div>
+                        <span id="historico-info-pagina">Página 1 de 1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL LOJA -->
+            <div id="modal-loja" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-[#0b1120] border border-gray-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl transition-colors">
+                    <h3 id="modal-loja-titulo" class="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-4">Adicionar Novo Local</h3>
+                    <input type="hidden" id="loja-original-nome" value="">
+                    <div class="space-y-4 text-xs sm:text-sm text-gray-700 dark:text-slate-300">
+                        <div>
+                            <label class="block mb-1 font-semibold">Nome do Local / Setor / Loja</label>
+                            <input type="text" id="nova-loja-nome" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded p-2 sm:p-2.5 outline-none focus:ring-1 focus:ring-blue-500 transition-colors" placeholder="Ex: ESTOQUE LOJA 15, TI, DIRETORIA">
+                        </div>
+                        <div>
+                            <label class="block mb-1 font-semibold">Cidade</label>
+                            <input type="text" id="nova-loja-cidade" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded p-2 sm:p-2.5 outline-none focus:ring-1 focus:ring-blue-500 transition-colors" placeholder="Ex: SANTA MARIA">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block mb-1 font-semibold">Estado</label>
+                                <input type="text" id="nova-loja-estado" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded p-2 sm:p-2.5 outline-none focus:ring-1 focus:ring-blue-500 transition-colors" placeholder="Ex: RS">
+                            </div>
+                            <div id="container-loja-status" class="hidden">
+                                <label class="block mb-1 font-semibold">Status</label>
+                                <select id="nova-loja-status" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded p-2 sm:p-2.5 outline-none focus:ring-1 focus:ring-blue-500 font-semibold transition-colors">
+                                    <option value="Ativa" class="text-green-600 dark:text-green-500">Ativa</option>
+                                    <option value="Inativa" class="text-red-600 dark:text-red-500">Inativa</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button onclick="fecharModalLoja()" class="px-4 py-2 rounded text-xs sm:text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-300 dark:border-slate-700 transition-colors">Cancelar</button>
+                        <button onclick="salvarLoja()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold transition text-xs sm:text-sm">Salvar Local</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL EDITAR MATERIAL -->
+            <div id="modal-editar-material" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 transition-opacity">
+                <div class="bg-white dark:bg-[#0b1120] border border-gray-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 w-full max-w-md shadow-2xl transition-colors">
+                    <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-4">Editar Nome do Item</h3>
+                    <input type="hidden" id="edit-mat-codigo" value="">
+                    <div class="space-y-4 text-xs sm:text-sm text-gray-700 dark:text-slate-300">
+                        <div>
+                            <label class="block mb-1 font-semibold">Código / SKU</label>
+                            <input type="text" id="edit-mat-codigo-display" class="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 rounded p-2 sm:p-2.5 outline-none cursor-not-allowed" disabled>
+                        </div>
+                        <div>
+                            <label class="block mb-1 font-semibold">Nova Descrição</label>
+                            <input type="text" id="edit-mat-descricao" class="w-full bg-white dark:bg-[#0f172a] border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-white rounded p-2 sm:p-2.5 outline-none focus:ring-1 focus:ring-blue-500 transition-colors" placeholder="Ex: Novo nome do item">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button onclick="fecharModalEditarMaterial()" class="px-4 py-2 rounded text-xs sm:text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 border border-gray-300 dark:border-slate-700 transition-colors">Cancelar</button>
+                        <button onclick="salvarEdicaoMaterial()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold transition text-xs sm:text-sm">Salvar Alteração</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL QR CODE (EXIBIÇÃO / IMPRESSÃO) -->
+            <div id="modal-qrcode" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 transition-opacity">
+                <div id="modal-qrcode-content" class="bg-white rounded-xl p-6 sm:p-8 w-full max-w-sm flex flex-col items-center shadow-2xl relative">
+                    <button onclick="fecharQRCode()" class="no-print absolute top-4 right-4 text-gray-400 hover:text-red-500 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <h3 id="modal-qrcode-titulo" class="text-lg font-bold text-gray-900 mb-1 text-center w-full truncate">Nome do Item</h3>
+                    <p id="modal-qrcode-cod" class="text-sm font-semibold text-blue-600 mb-6 uppercase tracking-widest">CODIGO</p>
+                    
+                    <div id="qrcode-container" class="bg-white p-2 rounded-lg shadow-sm border border-gray-200 flex justify-center items-center w-[160px] h-[160px]">
+                        <!-- Canvas Injetado Via JS -->
+                    </div>
+
+                    <div class="mt-8 flex gap-3 w-full no-print">
+                        <button onclick="fecharQRCode()" class="flex-1 px-4 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 border border-gray-300 font-semibold transition-colors">Fechar</button>
+                        <button onclick="imprimirQRCode()" class="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition flex items-center justify-center text-sm shadow-md">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            Imprimir
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL LEITOR DA CÂMERA (SCANNER) -->
+            <div id="modal-scanner" class="hidden fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-4">
+                <div class="w-full max-w-md bg-white dark:bg-[#0b1120] rounded-xl overflow-hidden shadow-2xl flex flex-col border border-gray-200 dark:border-slate-800">
+                    <div class="p-4 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-800 dark:text-white">Escaneie o Código</h3>
+                        <button onclick="fecharScanner()" class="text-gray-500 hover:text-red-500 transition">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div id="reader" class="w-full min-h-[300px] bg-black"></div>
+                    <div class="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800">
+                        <p class="text-xs text-center text-gray-500 dark:text-slate-400">Aponte a câmera para o Código de Barras ou QR Code.</p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ================= LÓGICA DO FIREBASE E DO SISTEMA ================= -->
+    <script>
+        // ================= CONFIGURAÇÃO DO FIREBASE =================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAHaZy7lCLb1qpuTRbMMiAAB5o_FUhW__g",
+            authDomain: "controle-patrimonial-lb.firebaseapp.com",
+            databaseURL: "https://controle-patrimonial-lb-default-rtdb.firebaseio.com",
+            projectId: "controle-patrimonial-lb",
+            storageBucket: "controle-patrimonial-lb.firebasestorage.app",
+            messagingSenderId: "433548070462",
+            appId: "1:433548070462:web:de08a39ec474daa0a2cb6f",
+            measurementId: "G-CY1EK4ME9V"
+        };
+        
+        let db = null;
+        let analytics = null;
+
+        if (!firebase.apps.length) { 
+            firebase.initializeApp(firebaseConfig); 
+        }
+        db = firebase.database();
+        
+        if (firebase.analytics) {
+            analytics = firebase.analytics();
+        }
+
+        let usuarioLogado = null;
+        const ITENS_POR_PAGINA = 20;
+        let paginaAtualLojas = 1, paginaAtualEstoque = 1, paginaAtualProdutos = 1, paginaAtualHistorico = 1;
+        
+        let dadosLojas = [];
+        let dadosMateriais = [];
+        let dadosHistorico = [];
+        let carrinhoLote = []; 
+
+        const lojasDefault = [
+            { nome: "ESTOQUE TI - MATRIZ", cidade: "SANTA MARIA", estado: "RS", status: "Ativa" },
+            { nome: "MATERIAL DE ESCRITÓRIO", cidade: "SANTA MARIA", estado: "RS", status: "Ativa" }
+        ];
+
+        window.onload = function() { 
+            usuarioLogado = { nome: 'Acesso Direto Habilitado', perfil: 'ADMIN' };
+            document.getElementById('nome-usuario').innerText = usuarioLogado.nome;
+            
+            aplicarPermissoesDePerfil(); 
+            inicializarTema();
+            
+            if (db) {
+                document.getElementById('status-conexao-indicador').classList.add('bg-green-400');
+                document.getElementById('status-conexao-texto').innerText = 'Online (App 2)';
+                document.getElementById('status-conexao-texto').classList.add('text-green-400');
+
+                db.ref('lojas_app2').on('value', (snapshot) => {
+                    if(snapshot.exists()) { dadosLojas = snapshot.val(); } else { dadosLojas = lojasDefault; db.ref('lojas_app2').set(lojasDefault); }
+                    atualizarTelas();
+                });
+                db.ref('materiais_app2').on('value', (snapshot) => { dadosMateriais = snapshot.val() || []; atualizarTelas(); });
+                db.ref('movimentacoes_app2').on('value', (snapshot) => { dadosHistorico = snapshot.val() || []; atualizarTelas(); });
+            }
+            
+            mostrarAba('dashboard', document.getElementById('menu-dashboard'));
+        };
+
+        function atualizarTelas() {
+            carregarTabela(); atualizarDashboard(); renderizarLojas(); renderizarEstoque(); carregarTabelaHistorico(); carregarOpcoesLojasCadastro(); carregarOpcoesLojasMovimentacao(); carregarOpcoesLojasEstoque(); carregarOpcoesLojasLista();
+            atualizarDatalistProdutos(); 
+        }
+
+        function obterLojas() { return dadosLojas || []; }
+        function obterMateriais() { return dadosMateriais || []; }
+        function obterHistorico() { return dadosHistorico || []; }
+
+        function limparObjeto(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+        function salvarMateriaisNoBanco(lista) { dadosMateriais = lista; if(db) db.ref('materiais_app2').set(limparObjeto(lista)); }
+        function salvarLojasNoBanco(lista) { dadosLojas = lista; if(db) db.ref('lojas_app2').set(limparObjeto(lista)); }
+        function salvarHistoricoNoBanco(historico) { dadosHistorico = historico; if(db) db.ref('movimentacoes_app2').set(limparObjeto(historico)); }
+
+
+        // --- Temas e Controles Básicos ---
+        function inicializarTema() {
+            const temaSalvo = localStorage.getItem('tema');
+            const html = document.documentElement;
+            if (temaSalvo === 'dark' || (!temaSalvo && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+            } else { html.classList.remove('dark'); }
+            atualizarBotaoTema();
+        }
+        function alternarTema() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('tema', 'light'); } 
+            else { html.classList.add('dark'); localStorage.setItem('tema', 'dark'); }
+            atualizarBotaoTema();
+        }
+        function atualizarBotaoTema() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const iconSol = document.getElementById('icone-sol'); const iconLua = document.getElementById('icone-lua'); const textoTema = document.getElementById('texto-tema');
+            if (iconSol && iconLua && textoTema) {
+                if (isDark) { iconSol.classList.remove('hidden'); iconLua.classList.add('hidden'); textoTema.innerText = 'Modo Claro'; } 
+                else { iconSol.classList.add('hidden'); iconLua.classList.remove('hidden'); textoTema.innerText = 'Modo Escuro'; }
+            }
+        }
+
+        function toggleMenuMobile() {
+            const s = document.getElementById('sidebar'); const o = document.getElementById('sidebar-overlay');
+            const iconHam = document.getElementById('hamburger-icon'); const iconCls = document.getElementById('close-icon');
+            if (s.classList.contains('-translate-x-full')) {
+                s.classList.remove('-translate-x-full'); o.classList.remove('hidden'); iconHam.classList.add('hidden'); iconCls.classList.remove('hidden');
+            } else {
+                s.classList.add('-translate-x-full'); o.classList.add('hidden'); iconHam.classList.remove('hidden'); iconCls.classList.add('hidden');
+            }
+        }
+
+        function renderizarControlesPaginacao(totalPaginas, paginaAtual, containerId, nomeFuncao) {
+            const container = document.getElementById(containerId); if (!container) return; container.innerHTML = ''; if (totalPaginas <= 1) return;
+            const btnBase = "w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded border transition text-xs sm:text-sm focus:outline-none";
+            const btnDisabled = "opacity-50 cursor-not-allowed border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-600 bg-gray-50 dark:bg-transparent";
+            const btnInativa = "border-gray-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-slate-800 text-gray-600 dark:text-slate-300 bg-white dark:bg-transparent";
+            const btnAtiva = "bg-blue-600 text-white border-blue-600";
+            container.innerHTML += `<button onclick="${nomeFuncao}(${paginaAtual - 1})" ${paginaAtual === 1 ? 'disabled' : ''} class="${btnBase} ${paginaAtual === 1 ? btnDisabled : btnInativa}">&laquo;</button>`;
+            let inicio = Math.max(1, paginaAtual - 1); let fim = Math.min(totalPaginas, inicio + 2); if (fim - inicio < 2) inicio = Math.max(1, fim - 2);
+            for (let i = inicio; i <= fim; i++) { container.innerHTML += `<button onclick="${nomeFuncao}(${i})" class="${btnBase} ${i === paginaAtual ? btnAtiva : btnInativa}">${i}</button>`; }
+            container.innerHTML += `<button onclick="${nomeFuncao}(${paginaAtual + 1})" ${paginaAtual === totalPaginas ? 'disabled' : ''} class="${btnBase} ${paginaAtual === totalPaginas ? btnDisabled : btnInativa}">&raquo;</button>`;
+        }
+
+        function aplicarPermissoesDePerfil() {
+            const esconderOperador = ['btn-novo-produto', 'menu-importar', 'btn-excluir-lote', 'chk-todos', 'btn-nova-loja', 'btn-excluir-historico-lote', 'chk-todos-historico', 'btn-limpar-historico'];
+            esconderOperador.forEach(id => {
+                const el = document.getElementById(id); 
+                if(el) el.classList.remove('hidden');
+            });
+        }
+
+        function mostrarAba(nomeAba, elementoBotao = null) {
+            const s = document.getElementById('sidebar');
+            if(!s.classList.contains('-translate-x-full') && window.innerWidth < 768) toggleMenuMobile();
+            document.querySelectorAll('.aba-conteudo').forEach(aba => aba.classList.add('hidden'));
+            document.getElementById('aba-' + nomeAba).classList.remove('hidden');
+            if (elementoBotao) {
+                document.querySelectorAll('.menu-item').forEach(btn => { btn.classList.remove('bg-blue-500', 'text-white'); btn.classList.add('sidebar-text', 'sidebar-hover'); });
+                elementoBotao.classList.add('bg-blue-500', 'text-white'); elementoBotao.classList.remove('sidebar-text', 'sidebar-hover');
+            }
+            if(nomeAba === 'dashboard') atualizarDashboard();
+            if(nomeAba === 'lista') { paginaAtualProdutos = 1; carregarOpcoesLojasLista(); carregarTabela(); }
+            if(nomeAba === 'lojas') { paginaAtualLojas = 1; renderizarLojas(); }
+            if(nomeAba === 'estoque') { paginaAtualEstoque = 1; carregarOpcoesLojasEstoque(); renderizarEstoque(); }
+            if(nomeAba === 'relatorios') { carregarOpcoesRelatorio(); renderizarRelatorios(); }
+            if(nomeAba === 'movimentacao') { 
+                document.getElementById('mov-codigo').value = ''; 
+                buscarDadosMaterialParaCarrinho(); 
+                carregarOpcoesLojasMovimentacao(); 
+            }
+            if(nomeAba === 'historico') { paginaAtualHistorico = 1; carregarFiltroAnosHistorico(); carregarTabelaHistorico(); }
+        }
+
+        // ================= FUNÇÃO CENTRAL PARA EXTRAIR CÓDIGO DA BUSCA ================= //
+        function extrairCodigoBusca(termoRaw) {
+            if (!termoRaw) return '';
+            if (termoRaw.includes(' - ')) {
+                return termoRaw.split(' - ')[0].trim();
+            }
+            const mats = obterMateriais();
+            const achado = mats.find(m => m.descricao === termoRaw);
+            if (achado) return achado.codigo;
+            return termoRaw;
+        }
+
+        function atualizarDatalistProdutos() {
+            const dl = document.getElementById('lista-sugestoes-produtos');
+            if(!dl) return;
+            dl.innerHTML = '';
+            
+            const produtos = obterMateriais();
+            const unicos = {};
+            produtos.forEach(p => {
+                if(!unicos[p.codigo]) unicos[p.codigo] = p.descricao;
+            });
+            
+            for(let cod in unicos) {
+                dl.innerHTML += `<option value="${cod} - ${unicos[cod]}">`;
+            }
+        }
+
+        // ================= FUNÇÃO PARA CALCULAR EXPRESSÕES (SOMA/MULTIPLICAÇÃO) ================= //
+        function calcularExpressaoMath(inputElement) {
+            let valor = inputElement.value.trim().replace(/,/g, '.');
+            
+            if (/^[0-9+\-*/().\s]+$/.test(valor)) {
+                try {
+                    let resultado = Math.floor(Function('"use strict";return (' + valor + ')')());
+                    inputElement.value = resultado > 0 ? resultado : 1;
+                } catch(e) {
+                    inputElement.value = 1; 
+                }
+            } else {
+                let num = parseInt(valor);
+                inputElement.value = (isNaN(num) || num < 1) ? 1 : num;
+            }
+        }
+
+        // ================= FUNÇÕES DE EDIÇÃO DE MATERIAL ================= //
+        function abrirModalEditarMaterial(codigo) {
+            if (usuarioLogado.perfil !== 'ADMIN') return alert('Sem permissão.');
+            const mat = obterMateriais().find(m => m.codigo === codigo);
+            if (!mat) return;
+            
+            document.getElementById('edit-mat-codigo').value = mat.codigo;
+            document.getElementById('edit-mat-codigo-display').value = mat.codigo;
+            document.getElementById('edit-mat-descricao').value = mat.descricao;
+            
+            document.getElementById('modal-editar-material').classList.remove('hidden');
+        }
+
+        function fecharModalEditarMaterial() {
+            document.getElementById('modal-editar-material').classList.add('hidden');
+        }
+
+        function salvarEdicaoMaterial() {
+            const codigo = document.getElementById('edit-mat-codigo').value;
+            const novaDescricao = document.getElementById('edit-mat-descricao').value.trim().toUpperCase();
+
+            if (!novaDescricao) return alert('A descrição não pode ficar vazia.');
+
+            let lista = obterMateriais();
+            let alterado = false;
+            
+            lista.forEach(m => {
+                if (m.codigo === codigo) {
+                    if(m.descricao !== novaDescricao) alterado = true;
+                    m.descricao = novaDescricao;
+                }
+            });
+
+            if(alterado) {
+                salvarMateriaisNoBanco(lista);
+                
+                const h = obterHistorico();
+                h.push({
+                    data: new Date().toLocaleString('pt-BR'),
+                    codigo: codigo,
+                    descricao: novaDescricao,
+                    qtd: 0,
+                    origem: 'SISTEMA',
+                    destino: 'ATUALIZAÇÃO DE CADASTRO',
+                    obs: `Descrição alterada por: ${usuarioLogado.nome}`
+                });
+                salvarHistoricoNoBanco(h);
+
+                carregarTabela(); 
+                atualizarDashboard();
+            }
+            
+            fecharModalEditarMaterial();
+        }
+
+        // ================= FUNÇÕES DO QR CODE ================= //
+        let qrcodeObjeto = null;
+
+        function abrirQRCode(codigo, descricao) {
+            document.getElementById('modal-qrcode-titulo').innerText = descricao;
+            document.getElementById('modal-qrcode-cod').innerText = codigo;
+            
+            const container = document.getElementById('qrcode-container');
+            container.innerHTML = ''; 
+            
+            qrcodeObjeto = new QRCode(container, {
+                text: codigo,
+                width: 150,
+                height: 150,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+
+            document.getElementById('modal-qrcode').classList.remove('hidden');
+        }
+
+        function fecharQRCode() { document.getElementById('modal-qrcode').classList.add('hidden'); }
+        function imprimirQRCode() { window.print(); }
+
+        // ================= FUNÇÕES DO SCANNER (CÂMERA) ================= //
+        let html5QrcodeScanner = null;
+        let targetScannerInput = ''; 
+
+        function abrirScanner(inputId) {
+            targetScannerInput = inputId;
+            document.getElementById('modal-scanner').classList.remove('hidden');
+            
+            if(!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("reader");
+            }
+
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, 
+                (decodedText, decodedResult) => {
+                    document.getElementById(targetScannerInput).value = decodedText;
+                    fecharScanner();
+                    
+                    if (targetScannerInput === 'codigo') {
+                        buscarMaterialCadastro(); 
+                    } else if (targetScannerInput === 'mov-codigo') {
+                        buscarDadosMaterialParaCarrinho(); 
+                    }
+                },
+                (errorMessage) => { }
+            ).catch((err) => {
+                alert("Erro ao acessar a câmera. Verifique as permissões do navegador.");
+                fecharScanner();
+            });
+        }
+
+        function fecharScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                }).catch(err => console.error("Erro ao parar câmera", err));
+            }
+            document.getElementById('modal-scanner').classList.add('hidden');
+        }
+
+
+        // ================= CADASTRO E CONTROLE DE QUANTIDADE ================= //
+        function carregarOpcoesLojasCadastro() { 
+            const select = document.getElementById('loja'); 
+            select.innerHTML = ''; 
+            obterLojas().forEach(l => { 
+                if(l.status === 'Ativa') select.innerHTML += `<option value="${l.nome}">${l.nome}</option>`; 
+            }); 
+        }
+
+        function abrirCadastroProduto() { 
+            carregarOpcoesLojasCadastro(); 
+            mostrarAba('cadastro'); 
+        }
+
+        function buscarMaterialCadastro() {
+            const codRaw = document.getElementById('codigo').value.trim().toUpperCase();
+            const cod = extrairCodigoBusca(codRaw); 
+            
+            const inputDesc = document.getElementById('descricao');
+            const inputObs = document.getElementById('obs-cadastro');
+            const inputUnd = document.getElementById('und-cadastro');
+            const infoQtd = document.getElementById('info-qtd-existente');
+
+            if (!cod) {
+                inputDesc.classList.remove('border-green-500', 'text-green-700', 'dark:text-green-400');
+                if (inputObs) inputObs.value = '';
+                if (inputUnd) inputUnd.value = 'UN';
+                if (infoQtd) infoQtd.classList.add('hidden');
+                return;
+            }
+
+            const materiais = obterMateriais();
+            const matEncontrados = materiais.filter(m => m.codigo === cod || m.descricao === cod);
+
+            if (matEncontrados.length > 0) {
+                inputDesc.value = matEncontrados[0].descricao;
+                inputDesc.classList.add('border-green-500', 'text-green-700', 'dark:text-green-400');
+                
+                if (inputObs) inputObs.value = matEncontrados[0].obsProduto || '';
+                if (inputUnd) inputUnd.value = matEncontrados[0].und || 'UN';
+                
+                const totalQtd = matEncontrados.reduce((acc, curr) => acc + curr.qtd, 0);
+                
+                if (infoQtd) {
+                    infoQtd.innerHTML = `💡 Item já cadastrado. Estoque total atual: ${totalQtd} ${matEncontrados[0].und || 'UN'}.`;
+                    infoQtd.classList.remove('hidden');
+                }
+            } else {
+                inputDesc.classList.remove('border-green-500', 'text-green-700', 'dark:text-green-400');
+                if (inputObs) inputObs.value = '';
+                if (inputUnd) inputUnd.value = 'UN';
+                if (infoQtd) infoQtd.classList.add('hidden');
+            }
+        }
+
+        function salvarMaterial(e) {
+            e.preventDefault();
+            
+            calcularExpressaoMath(document.getElementById('qtd'));
+
+            const codRaw = document.getElementById('codigo').value.trim().toUpperCase();
+            let cod = extrairCodigoBusca(codRaw);
+            let desc = document.getElementById('descricao').value.toUpperCase();
+            let loja = document.getElementById('loja').value;
+            let qtd = parseInt(document.getElementById('qtd').value) || 1;
+            let obsProd = document.getElementById('obs-cadastro').value.trim().toUpperCase();
+            let undProd = document.getElementById('und-cadastro').value;
+
+            const lst = obterMateriais();
+            if (!cod) cod = "ITEM-" + Math.floor(10000 + Math.random() * 90000);
+
+            let idx = lst.findIndex(m => m.codigo === cod && m.loja === loja);
+            if(idx > -1) {
+                lst[idx].qtd += qtd;
+                if (obsProd) lst[idx].obsProduto = obsProd; 
+                lst[idx].und = undProd;
+            } else {
+                lst.unshift({ codigo: cod, descricao: desc, loja: loja, qtd: qtd, obsProduto: obsProd, und: undProd });
+            }
+
+            const h = obterHistorico();
+            h.push({
+                data: new Date().toLocaleString('pt-BR'),
+                codigo: cod,
+                descricao: desc,
+                qtd: qtd,
+                origem: 'ENTRADA / NOVO',
+                destino: loja,
+                obs: obsProd ? `Entrada Inicial - Obs: ${obsProd}` : 'Entrada Inicial no Sistema'
+            });
+
+            salvarMateriaisNoBanco(lst);
+            salvarHistoricoNoBanco(h);
+            
+            document.getElementById('msg-sucesso').classList.remove('hidden');
+            document.getElementById('form-cadastro').reset();
+            document.getElementById('descricao').classList.remove('border-green-500', 'text-green-700', 'dark:text-green-400');
+            document.getElementById('obs-cadastro').value = '';
+            document.getElementById('und-cadastro').value = 'UN';
+            
+            const infoQtd = document.getElementById('info-qtd-existente');
+            if(infoQtd) infoQtd.classList.add('hidden');
+
+            setTimeout(() => document.getElementById('msg-sucesso').classList.add('hidden'), 3000);
+        }
+
+        // ================= TRANSFERÊNCIAS E BAIXAS EM LOTE (CARRINHO) ================= //
+        function carregarOpcoesLojasMovimentacao() { 
+            const s = document.getElementById('lote-destino'); 
+            s.innerHTML = '<option value="">-- Selecione o Destino (Transferência) --</option>'; 
+            obterLojas().forEach(l => { 
+                if(l.status === 'Ativa') s.innerHTML += `<option value="${l.nome}">${l.nome}</option>`; 
+            }); 
+        }
+
+        function buscarDadosMaterialParaCarrinho() { 
+            const codRaw = document.getElementById('mov-codigo').value.trim().toUpperCase(); 
+            const cod = extrairCodigoBusca(codRaw); 
+            
+            const materiaisEncontrados = obterMateriais().filter(m => (m.codigo === cod || m.descricao === cod) && m.qtd > 0); 
+            
+            const elD = document.getElementById('mov-produto-desc'); 
+            const selectOrigem = document.getElementById('mov-origem'); 
+            const movQtd = document.getElementById('mov-qtd');
+            const btnAdd = document.getElementById('btn-add-carrinho'); 
+
+            if (materiaisEncontrados.length > 0) { 
+                const totalDisp = materiaisEncontrados.reduce((acc, curr) => acc + curr.qtd, 0);
+
+                elD.innerHTML = `📦 <span class="text-blue-600 dark:text-blue-400">${materiaisEncontrados[0].descricao}</span> <br><span class="text-indigo-500 dark:text-indigo-400 font-bold mt-1 inline-block">Estoque Geral: ${totalDisp} ${materiaisEncontrados[0].und || 'UN'}</span>`; 
+                elD.className = "text-[11px] sm:text-xs font-bold mt-2 text-gray-700 dark:text-slate-300"; 
+                
+                selectOrigem.innerHTML = '<option value="">-- Selecione o local de origem --</option>';
+                materiaisEncontrados.forEach(m => {
+                    selectOrigem.innerHTML += `<option value="${m.loja}">${m.loja} (Disp: ${m.qtd} ${m.und || 'UN'})</option>`;
+                });
+                
+                selectOrigem.disabled = false;
+                
+                if(materiaisEncontrados.length === 1) {
+                    selectOrigem.value = materiaisEncontrados[0].loja;
+                    movQtd.focus(); 
+                }
+
+                btnAdd.disabled = false; btnAdd.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else { 
+                elD.innerHTML = cod ? `❌ Item não encontrado ou sem saldo.` : "Aguardando Código..."; 
+                elD.className = cod ? "text-[11px] sm:text-xs font-bold mt-2 text-red-500" : "text-[11px] sm:text-xs font-bold mt-2 text-gray-500 dark:text-slate-500"; 
+                
+                selectOrigem.innerHTML = '<option value="">-- Aguardando --</option>';
+                selectOrigem.disabled = true;
+                
+                btnAdd.disabled = true; btnAdd.classList.add('opacity-50', 'cursor-not-allowed');
+            } 
+        }
+
+        function atualizarMaxQtdCarrinho() { }
+
+        function adicionarAoCarrinho() {
+            calcularExpressaoMath(document.getElementById('mov-qtd'));
+
+            const codRaw = document.getElementById('mov-codigo').value.trim().toUpperCase();
+            const cod = extrairCodigoBusca(codRaw);
+            const origem = document.getElementById('mov-origem').value;
+            let qtdAdd = parseInt(document.getElementById('mov-qtd').value);
+
+            if(!cod || !origem || !qtdAdd || qtdAdd <= 0) return alert("Preencha dados e quantidade válida.");
+
+            const matBase = obterMateriais().find(m => (m.codigo === cod || m.descricao === cod) && m.loja === origem);
+            if(!matBase) return alert("Item não encontrado no estoque atual.");
+
+            let idxCarrinho = carrinhoLote.findIndex(c => c.codigo === matBase.codigo && c.origem === origem);
+            let qtdJaNoCarrinho = idxCarrinho > -1 ? carrinhoLote[idxCarrinho].qtd : 0;
+
+            if ((qtdAdd + qtdJaNoCarrinho) > matBase.qtd) {
+                return alert(`Saldo insuficiente! Estoque disponível: ${matBase.qtd}. Já no carrinho: ${qtdJaNoCarrinho}.`);
+            }
+
+            if (idxCarrinho > -1) {
+                carrinhoLote[idxCarrinho].qtd += qtdAdd;
+            } else {
+                carrinhoLote.push({
+                    codigo: matBase.codigo,
+                    descricao: matBase.descricao,
+                    origem: origem,
+                    qtd: qtdAdd,
+                    und: matBase.und || 'UN'
+                });
+            }
+
+            renderizarCarrinho();
+
+            document.getElementById('mov-codigo').value = '';
+            document.getElementById('mov-qtd').value = '1';
+            document.getElementById('mov-codigo').focus();
+            buscarDadosMaterialParaCarrinho();
+        }
+
+        function removerDoCarrinho(index) {
+            carrinhoLote.splice(index, 1);
+            renderizarCarrinho();
+        }
+
+        function renderizarCarrinho() {
+            const tbody = document.getElementById('tabela-carrinho');
+            tbody.innerHTML = '';
+
+            document.getElementById('cart-count').innerText = carrinhoLote.length;
+
+            if (carrinhoLote.length === 0) {
+                document.getElementById('btn-lote-transf').disabled = true;
+                document.getElementById('btn-lote-transf').classList.add('opacity-50', 'cursor-not-allowed');
+                
+                document.getElementById('btn-lote-consumo').disabled = true;
+                document.getElementById('btn-lote-consumo').classList.add('opacity-50', 'cursor-not-allowed');
+                
+                document.getElementById('btn-lote-baixa').disabled = true;
+                document.getElementById('btn-lote-baixa').classList.add('opacity-50', 'cursor-not-allowed');
+                
+                return tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-gray-400 italic">Lista vazia. Adicione itens para continuar.</td></tr>';
+            }
+
+            carrinhoLote.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-100 dark:hover:bg-[#1e293b] border-b border-gray-100 dark:border-slate-700 transition-colors h-12">
+                        <td class="p-3 font-bold text-gray-800 dark:text-white">${item.codigo}</td>
+                        <td class="p-3 text-gray-600 dark:text-slate-300 max-w-[150px] truncate" title="${item.descricao}">${item.descricao}</td>
+                        <td class="p-3 text-gray-600 dark:text-slate-300 text-[11px]">${item.origem}</td>
+                        <td class="p-3 text-center font-bold text-blue-600 dark:text-blue-400">${item.qtd} <span class="text-[10px] text-gray-500">${item.und || 'UN'}</span></td>
+                        <td class="p-3 text-center">
+                            <button onclick="removerDoCarrinho(${index})" class="text-gray-400 hover:text-red-500 transition">
+                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('btn-lote-transf').disabled = false;
+            document.getElementById('btn-lote-transf').classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            document.getElementById('btn-lote-consumo').disabled = false;
+            document.getElementById('btn-lote-consumo').classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            document.getElementById('btn-lote-baixa').disabled = false;
+            document.getElementById('btn-lote-baixa').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function processarLote(tipo) {
+            if(carrinhoLote.length === 0) return alert("Carrinho vazio!");
+            
+            let destinoFinal = null;
+            if (tipo === 'TRANSFERENCIA' || tipo === 'CONSUMO_IMEDIATO') {
+                destinoFinal = document.getElementById('lote-destino').value;
+                if(!destinoFinal) return alert("Selecione o local de destino na caixa abaixo da lista para realizar esta operação.");
+            }
+
+            const obs = document.getElementById('lote-obs').value.toUpperCase() || 
+                        (tipo === 'BAIXA' ? 'BAIXA EM LOTE' : 
+                        (tipo === 'CONSUMO_IMEDIATO' ? 'ENVIO PARA CONSUMO DIRETO' : 'TRANSFERÊNCIA EM LOTE'));
+
+            let listaDB = obterMateriais();
+            let histDB = obterHistorico();
+            let dataAtual = new Date().toLocaleString('pt-BR');
+
+            carrinhoLote.forEach(item => {
+                let idxOrigem = listaDB.findIndex(m => m.codigo === item.codigo && m.loja === item.origem);
+                
+                if (idxOrigem > -1) {
+                    listaDB[idxOrigem].qtd -= item.qtd;
+
+                    let destinoParaHistorico = destinoFinal;
+
+                    if (tipo === 'BAIXA') {
+                        destinoParaHistorico = 'CONSUMO / BAIXA';
+                    } else if (tipo === 'CONSUMO_IMEDIATO') {
+                        destinoParaHistorico = destinoFinal + ' (USO IMEDIATO)';
+                    } else {
+                        let idxDest = listaDB.findIndex(m => m.codigo === item.codigo && m.loja === destinoFinal);
+                        if (idxDest > -1) {
+                            listaDB[idxDest].qtd += item.qtd;
+                            if (listaDB[idxOrigem].obsProduto) listaDB[idxDest].obsProduto = listaDB[idxOrigem].obsProduto;
+                            if (listaDB[idxOrigem].und) listaDB[idxDest].und = listaDB[idxOrigem].und;
+                        } else {
+                            listaDB.push({codigo: item.codigo, descricao: item.descricao, loja: destinoFinal, qtd: item.qtd, obsProduto: listaDB[idxOrigem].obsProduto || '', und: item.und || 'UN'});
+                        }
+                    }
+
+                    if (listaDB[idxOrigem].qtd <= 0) listaDB.splice(idxOrigem, 1);
+
+                    histDB.push({
+                        data: dataAtual,
+                        codigo: item.codigo,
+                        descricao: item.descricao,
+                        qtd: item.qtd,
+                        origem: item.origem,
+                        destino: destinoParaHistorico,
+                        obs: obs
+                    });
+                }
+            });
+
+            salvarMateriaisNoBanco(listaDB);
+            salvarHistoricoNoBanco(histDB);
+
+            carrinhoLote = [];
+            renderizarCarrinho();
+            document.getElementById('lote-obs').value = '';
+            document.getElementById('lote-destino').value = '';
+
+            if(tipo === 'CONSUMO_IMEDIATO') {
+                alert("✅ Transferência para Consumo registrada!\n\nOs itens foram retirados da origem e constam no Histórico, mas NÃO ocuparão o estoque do destino.");
+            } else {
+                alert(tipo === 'BAIXA' ? "✅ Baixa em Lote realizada com sucesso!" : "✅ Transferência em Lote concluída!");
+            }
+        }
+
+
+        // ================= ABA: RELATÓRIOS E PDF ================= //
+        function carregarOpcoesRelatorio() {
+            const select = document.getElementById('relatorio-loja-select');
+            const valorAtual = select.value;
+            select.innerHTML = '<option value="TODAS">-- Mostrar Todos os Locais --</option>';
+            obterLojas().forEach(l => select.innerHTML += `<option value="${l.nome}">${l.nome}</option>`);
+            if(valorAtual) select.value = valorAtual;
+        }
+
+        function renderizarRelatorios() {
+            const container = document.getElementById('container-relatorios');
+            container.innerHTML = '';
+            let lojas = obterLojas();
+            const produtos = obterMateriais();
+            const lojaSelecionada = document.getElementById('relatorio-loja-select').value;
+            
+            const btnTexto = document.getElementById('btn-exportar-texto');
+            const btnPdfTexto = document.getElementById('btn-exportar-pdf-texto');
+
+            if (lojas.length === 0) return container.innerHTML = '<p class="text-gray-500 dark:text-slate-400">Nenhum local cadastrado.</p>';
+
+            if (lojaSelecionada !== "TODAS") {
+                lojas = lojas.filter(l => l.nome === lojaSelecionada);
+                btnTexto.innerText = `CSV (${lojaSelecionada})`; btnPdfTexto.innerText = `PDF (${lojaSelecionada})`;
+            } else {
+                btnTexto.innerText = `CSV (Todos os Locais)`; btnPdfTexto.innerText = `PDF (Todos os Locais)`;
+            }
+
+            if(lojas.length === 0) return container.innerHTML = '<p class="text-gray-500 dark:text-slate-400">Nenhum local encontrado com este filtro.</p>';
+
+            lojas.forEach(loja => {
+                const pLoja = produtos.filter(p => p.loja.toUpperCase() === loja.nome.toUpperCase());
+                if (lojaSelecionada === "TODAS" && pLoja.length === 0) return;
+
+                let bgCard = 'bg-white dark:bg-[#0b1120] border-gray-200 dark:border-slate-800';
+
+                let html = `
+                <div class="${bgCard} rounded-lg border p-4 sm:p-5 shadow-sm transition-colors">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">${loja.nome} <span class="text-xs font-normal text-blue-600 dark:text-blue-400 ml-2 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800/50">${pLoja.length} itens dif.</span></h3>
+                        ${lojaSelecionada === "TODAS" ? `
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <button onclick="exportarLojaCSV('${loja.nome}')" class="flex-1 sm:flex-none justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white text-[10px] sm:text-xs font-bold py-1.5 px-3 rounded transition flex items-center border border-slate-300 dark:border-slate-600 shadow-sm">CSV</button>
+                            <button onclick="exportarLojaPDF('${loja.nome}')" class="flex-1 sm:flex-none justify-center bg-red-50 hover:bg-red-100 dark:bg-red-900/50 dark:hover:bg-red-800 text-red-600 dark:text-red-200 text-[10px] sm:text-xs font-bold py-1.5 px-3 rounded transition flex items-center border border-red-200 dark:border-red-700/50 shadow-sm">PDF</button>
+                        </div>` : ''}
+                    </div>`;
+
+                if (pLoja.length === 0) {
+                    html += `<p class="text-xs sm:text-sm text-gray-500 dark:text-slate-500 italic pb-2">Nenhum item alocado neste local.</p></div>`;
+                    container.innerHTML += html; return; 
+                }
+
+                html += `<div class="overflow-x-auto rounded border border-gray-200 dark:border-slate-800">
+                            <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[350px]"><thead class="bg-slate-50 dark:bg-[#0f172a]"><tr class="text-gray-500 dark:text-slate-400 font-semibold border-b border-gray-200 dark:border-slate-800">
+                                <th class="p-2 sm:p-3">Código</th><th class="p-2 sm:p-3">Descrição do Item</th><th class="p-2 sm:p-3 text-center">Qtde</th></tr></thead>
+                            <tbody class="text-gray-700 dark:text-slate-200 divide-y border-gray-100 dark:border-slate-800 dark:divide-slate-800">`;
+
+                pLoja.forEach(p => {
+                    html += `<tr class="hover:bg-slate-50 dark:hover:bg-[#1e293b] transition-colors"><td class="p-2 sm:p-3 font-bold text-gray-800 dark:text-slate-200">${p.codigo}</td><td class="p-2 sm:p-3 text-gray-600 dark:text-slate-300">${p.descricao}</td><td class="p-2 sm:p-3 text-center font-bold text-blue-600 dark:text-blue-400">${p.qtd} <span class="text-[10px] text-gray-500">${p.und || 'UN'}</span></td></tr>`;
+                });
+
+                container.innerHTML += html + `</tbody></table></div></div>`;
+            });
+        }
+
+        function exportarRelatorioAtualPDF() {
+            const l = document.getElementById('relatorio-loja-select').value;
+            l === "TODAS" ? exportarBaseCompletaPDF() : exportarLojaPDF(l);
+        }
+        function exportarLojaPDF(nomeLoja) {
+            const produtos = obterMateriais().filter(p => p.loja.toUpperCase() === nomeLoja.toUpperCase());
+            if(produtos.length === 0) return alert(`Sem itens em ${nomeLoja}.`);
+            gerarPDF(produtos, `Relatório - ${nomeLoja}`, `relatorio_${nomeLoja.replace(/\s+/g, '_').toLowerCase()}.pdf`, ["Código", "Descrição", "Local", "Quantidade", "Observação"]);
+        }
+        function exportarBaseCompletaPDF() {
+            const produtos = obterMateriais();
+            if(produtos.length === 0) return alert("Sem dados.");
+            gerarPDF(produtos, "Relatório Geral - Todos os Locais", "relatorio_todos_locais.pdf", ["Código", "Descrição", "Local", "Quantidade", "Observação"]);
+        }
+
+        function gerarPDF(arrayDados, titulo, nomeArquivo, colunasArray) {
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.setFontSize(16); doc.text(titulo, 14, 20);
+            doc.setFontSize(10); doc.setTextColor(100); doc.text("Gerado em: " + new Date().toLocaleString('pt-BR'), 14, 28);
+            
+            const linhas = arrayDados.map(item => {
+                if(colunasArray[0] === "Data / Hora") return [item.data, `${item.codigo} - ${item.descricao}\n(Qtd: ${item.qtd} ${item.und || 'UN'})`, item.origem, item.destino, item.obs];
+                
+                if(colunasArray.includes("Qtd. Total") || colunasArray.includes("Quantidade Total Consolidada")) {
+                    let status = item.qtd > 10 ? "Em Estoque" : "Baixo";
+                    return [item.codigo, item.descricao, `${item.qtd} ${item.und || 'UN'}`, status, item.obsProduto || "-"];
+                }
+                
+                return [item.codigo, item.descricao, item.loja, `${item.qtd} ${item.und || 'UN'}`, item.obsProduto || "-"];
+            });
+
+            doc.autoTable({
+                startY: 35, head: [colunasArray], body: linhas, theme: 'striped',
+                headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, margin: { top: 30 }
+            });
+            doc.save(nomeArquivo);
+        }
+
+        function exportarRelatorioAtual() {
+            const l = document.getElementById('relatorio-loja-select').value;
+            l === "TODAS" ? exportarCSV() : exportarLojaCSV(l);
+        }
+        function exportarLojaCSV(nomeLoja) {
+            const produtos = obterMateriais().filter(p => p.loja.toUpperCase() === nomeLoja.toUpperCase());
+            if(produtos.length === 0) return;
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFFCodigo;Descricao;Local;Quantidade;Observacao\n";
+            produtos.forEach(bem => csvContent += `${bem.codigo};${bem.descricao};${bem.loja};${bem.qtd} ${bem.und || 'UN'};${bem.obsProduto || ''}\n`);
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", `relatorio_${nomeLoja.replace(/\s+/g, '_').toLowerCase()}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // ================= ABA: HISTÓRICO AVANÇADO ================= //
+        function carregarFiltroAnosHistorico() {
+            const anos = new Set();
+            obterHistorico().forEach(reg => {
+                let parts = reg.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if(parts && parts[3]) anos.add(parts[3]);
+            });
+            const selectAno = document.getElementById('filtro-ano-historico');
+            let atual = selectAno.value;
+            selectAno.innerHTML = '<option value="">Todos</option>';
+            Array.from(anos).sort().reverse().forEach(a => selectAno.innerHTML += `<option value="${a}">${a}</option>`);
+            if(atual) selectAno.value = atual;
+        }
+
+        function obterHistoricoFiltrado() {
+            let historico = obterHistorico();
+            let mes = document.getElementById('filtro-mes-historico').value;
+            let ano = document.getElementById('filtro-ano-historico').value;
+
+            let comIndex = historico.map((item, index) => ({ ...item, originalIndex: index }));
+
+            return comIndex.filter(reg => {
+                let parts = reg.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if(parts && parts.length === 4) {
+                    if(mes && parts[2] !== mes) return false;
+                    if(ano && parts[3] !== ano) return false;
+                }
+                return true;
+            });
+        }
+
+        function mudarPaginaHistorico(page) { paginaAtualHistorico = page; carregarTabelaHistorico(); }
+
+        function carregarTabelaHistorico() {
+            const historicoFiltrado = obterHistoricoFiltrado();
+            const tbody = document.getElementById('tabela-historico'); 
+            tbody.innerHTML = ''; 
+
+            if(historicoFiltrado.length === 0) {
+                document.getElementById('historico-total-registros').innerText = "0 registro(s)";
+                document.getElementById('historico-info-pagina').innerText = "Página 1 de 1";
+                document.getElementById('historico-paginacao').innerHTML = "";
+                return tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500 dark:text-slate-500 text-sm">Nenhum registro encontrado.</td></tr>';
+            }
+
+            const historicoReverse = historicoFiltrado.slice().reverse();
+            const total = historicoReverse.length;
+            const totalPaginas = Math.ceil(total / ITENS_POR_PAGINA) || 1;
+            if(paginaAtualHistorico > totalPaginas) paginaAtualHistorico = totalPaginas;
+
+            document.getElementById('historico-total-registros').innerText = `${total} registro(s)`;
+            document.getElementById('historico-info-pagina').innerText = `Página ${paginaAtualHistorico} de ${totalPaginas}`;
+
+            const start = (paginaAtualHistorico - 1) * ITENS_POR_PAGINA;
+            const paginated = historicoReverse.slice(start, start + ITENS_POR_PAGINA);
+
+            paginated.forEach(reg => {
+                const isExc = reg.destino === 'REGISTRO EXCLUÍDO';
+                const isImp = reg.origem === 'PLANILHA' && reg.destino === 'IMPORTADO';
+                const isBaixa = reg.destino === 'CONSUMO / BAIXA';
+                const isEdit = reg.destino === 'ATUALIZAÇÃO DE CADASTRO';
+                const isConsumoImediato = reg.destino.includes('(USO IMEDIATO)');
+                
+                let colorClass = 'hover:bg-slate-50 dark:hover:bg-[#1e293b] text-gray-700 dark:text-slate-300';
+                let destColor = 'text-blue-600 dark:text-blue-400';
+
+                if (isExc) { 
+                    colorClass = 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'; 
+                    destColor = 'text-red-600 dark:text-red-500';
+                } else if (isImp) { 
+                    colorClass = 'bg-blue-50/30 text-blue-800 dark:bg-blue-950/10 dark:text-blue-300'; 
+                } else if (isBaixa) {
+                    colorClass = 'bg-orange-50/80 text-orange-900 dark:bg-orange-900/20 dark:text-orange-200';
+                    destColor = 'text-orange-600 dark:text-orange-400 font-extrabold';
+                } else if (isEdit) {
+                    colorClass = 'bg-indigo-50/80 text-indigo-900 dark:bg-indigo-900/20 dark:text-indigo-300';
+                    destColor = 'text-indigo-600 dark:text-indigo-400 font-extrabold';
+                } else if (isConsumoImediato) {
+                    colorClass = 'bg-purple-50/80 text-purple-900 dark:bg-purple-900/20 dark:text-purple-200';
+                    destColor = 'text-purple-600 dark:text-purple-400 font-extrabold';
+                }
+
+                let chk = `<td class="p-4 text-center border-b border-gray-100 dark:border-slate-800"><input type="checkbox" class="chk-item-historico cursor-pointer w-4 h-4 text-blue-600 rounded bg-white dark:bg-[#0f172a] border-gray-300 dark:border-slate-600 focus:ring-blue-500" value="${reg.originalIndex}"></td>`;
+
+                tbody.innerHTML += `
+                    <tr class="${colorClass} border-b border-gray-100 dark:border-slate-800 transition-colors h-14">
+                        ${chk}
+                        <td class="p-4 whitespace-nowrap">${reg.data}</td>
+                        <td class="p-4 font-bold text-gray-800 dark:text-white max-w-[150px] truncate" title="${reg.codigo}">${reg.codigo} <span class="text-xs font-normal ml-1">(${reg.qtd}x)</span></td>
+                        <td class="p-4 max-w-[120px] truncate" title="${reg.origem}">${reg.origem}</td>
+                        <td class="p-4 font-bold max-w-[200px] truncate ${destColor}" title="${reg.destino}">${reg.destino}</td>
+                        <td class="p-4 font-medium text-gray-800 dark:text-white max-w-[180px] truncate" title="${reg.obs}">
+                            <span class="text-[10px] uppercase text-gray-500 block leading-none mb-1">${reg.descricao}</span>
+                            ${reg.obs}
+                        </td>
+                    </tr>`;
+            });
+
+            renderizarControlesPaginacao(totalPaginas, paginaAtualHistorico, 'historico-paginacao', 'mudarPaginaHistorico');
+        }
+
+        function exportarHistoricoCSV() {
+            const filtrado = obterHistoricoFiltrado();
+            if(filtrado.length === 0) return alert("Sem dados.");
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFFData_Hora;Codigo;Qtd;Origem;Destino;Obs\n";
+            filtrado.slice().reverse().forEach(reg => {
+                csvContent += `${reg.data};${reg.codigo};${reg.qtd};${reg.origem};${reg.destino};${reg.obs}\n`;
+            });
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "historico_filtrado.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function exportarHistoricoPDF() {
+            const filtrado = obterHistoricoFiltrado();
+            if(filtrado.length === 0) return alert("Sem dados.");
+            
+            let mes = document.getElementById('filtro-mes-historico').options[document.getElementById('filtro-mes-historico').selectedIndex].text;
+            let ano = document.getElementById('filtro-ano-historico').value;
+            let titulo = "Histórico de Movimentações";
+            if(ano) titulo += ` - ${mes} de ${ano}`;
+
+            gerarPDF(filtrado.slice().reverse(), titulo, "historico_movimentacoes.pdf", ["Data / Hora", "Item / Produto (Qtd)", "Origem", "Destino", "Observação / Motivo"]);
+        }
+
+        function toggleTodosHistorico(source) { document.querySelectorAll('.chk-item-historico').forEach(chk => chk.checked = source.checked); }
+
+        function excluirHistoricoSelecionados() {
+            const selecionados = document.querySelectorAll('.chk-item-historico:checked');
+            if (selecionados.length === 0) return;
+
+            if (confirm(`Apagar ${selecionados.length} registro(s) do histórico?`)) {
+                let historico = obterHistorico();
+                const indicesParaExcluir = Array.from(selecionados).map(chk => parseInt(chk.value));
+                historico = historico.filter((_, index) => !indicesParaExcluir.includes(index));
+                salvarHistoricoNoBanco(historico);
+
+                document.getElementById('chk-todos-historico').checked = false;
+                carregarTabelaHistorico(); carregarFiltroAnosHistorico();
+            }
+        }
+
+        function limparTodoHistorico() {
+            if (obterHistorico().length === 0) return;
+            if (confirm("🚨 CUIDADO!\nApagar TODO o histórico? NÃO pode ser desfeita.")) {
+                salvarHistoricoNoBanco([]);
+                paginaAtualHistorico = 1;
+                carregarTabelaHistorico(); carregarFiltroAnosHistorico();
+            }
+        }
+
+        // ================= FUNÇÕES DE LOJA ================= //
+        function buscarLojas() { paginaAtualLojas = 1; renderizarLojas(); }
+        function mudarPaginaLojas(page) { paginaAtualLojas = page; renderizarLojas(); }
+        function renderizarLojas() { 
+            const termoBusca = document.getElementById('busca-lojas').value.toLowerCase();
+            const lojas = obterLojas(); const produtos = obterMateriais();
+            const tbody = document.getElementById('tabela-lojas'); tbody.innerHTML = '';
+            let filtradas = lojas.filter(l => l.nome.toLowerCase().includes(termoBusca) || l.cidade.toLowerCase().includes(termoBusca));
+            const tPaginas = Math.ceil(filtradas.length / ITENS_POR_PAGINA) || 1;
+            if(paginaAtualLojas > tPaginas) paginaAtualLojas = tPaginas;
+            document.getElementById('lojas-total-registros').innerText = `${filtradas.length} registro(s)`;
+            document.getElementById('lojas-info-pagina').innerText = `Página ${paginaAtualLojas} de ${tPaginas}`;
+            const p = filtradas.slice((paginaAtualLojas - 1) * ITENS_POR_PAGINA, (paginaAtualLojas - 1) * ITENS_POR_PAGINA + ITENS_POR_PAGINA);
+            p.forEach(loja => {
+                const q = produtos.filter(x => x.loja.toUpperCase() === loja.nome.toUpperCase()).length; // variedaded de itens
+                const bc = loja.status === 'Ativa' ? 'lojas-badge-active bg-green-500/10 text-green-500 border border-green-500/20' : 'lojas-badge-inactive bg-red-500/10 text-red-500 border border-red-500/20';
+                tbody.innerHTML += `<tr class="hover:bg-slate-50 dark:hover:bg-[#1e293b] transition-colors h-14"><td class="p-4 font-bold text-gray-800 dark:text-white">${loja.nome}</td><td class="p-4 uppercase text-gray-600 dark:text-slate-300">${loja.cidade}</td><td class="p-4 text-gray-600 dark:text-slate-300">${loja.estado}</td><td class="p-4 text-blue-600 dark:text-blue-400 font-bold">${q}</td><td class="p-4"><span class="${bc} px-3 py-1 rounded-full text-xs font-semibold">${loja.status}</span></td><td class="p-4 text-center"><div class="flex justify-center gap-2"><button onclick="abrirModalEditarLoja('${loja.nome}')" class="text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 transition" title="Editar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button><button onclick="excluirLoja('${loja.nome}')" class="text-gray-400 dark:text-slate-500 hover:text-red-500 transition" title="Excluir"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div></td></tr>`;
+            });
+            renderizarControlesPaginacao(tPaginas, paginaAtualLojas, 'lojas-paginacao', 'mudarPaginaLojas');
+        }
+        function abrirModalNovaLoja() { document.getElementById('modal-loja-titulo').innerText = "Adicionar Novo Local"; document.getElementById('loja-original-nome').value = ""; document.getElementById('nova-loja-nome').value = ""; document.getElementById('nova-loja-cidade').value = ""; document.getElementById('nova-loja-estado').value = ""; document.getElementById('container-loja-status').classList.add('hidden'); document.getElementById('modal-loja').classList.remove('hidden'); }
+        function abrirModalEditarLoja(nome) { const l = obterLojas().find(x => x.nome === nome); if(!l) return; document.getElementById('modal-loja-titulo').innerText = "Editar Local"; document.getElementById('loja-original-nome').value = l.nome; document.getElementById('nova-loja-nome').value = l.nome; document.getElementById('nova-loja-cidade').value = l.cidade; document.getElementById('nova-loja-estado').value = l.estado; document.getElementById('nova-loja-status').value = l.status || 'Ativa'; document.getElementById('container-loja-status').classList.remove('hidden'); document.getElementById('modal-loja').classList.remove('hidden'); }
+        function fecharModalLoja() { document.getElementById('modal-loja').classList.add('hidden'); }
+        function salvarLoja() { const original = document.getElementById('loja-original-nome').value; const novo = document.getElementById('nova-loja-nome').value.trim().toUpperCase(); const cidade = document.getElementById('nova-loja-cidade').value.trim().toUpperCase(); const estado = document.getElementById('nova-loja-estado').value.trim().toUpperCase() || 'RS'; const status = document.getElementById('container-loja-status').classList.contains('hidden') ? 'Ativa' : document.getElementById('nova-loja-status').value; if (!novo || !cidade) return alert('Preencha nome e cidade.'); let lojas = obterLojas(); if (original) { if(novo !== original && lojas.find(l => l.nome === novo)) return alert('Nome já existe!'); const idx = lojas.findIndex(l => l.nome === original); lojas[idx] = { nome: novo, cidade: cidade, estado: estado, status: status }; salvarLojasNoBanco(lojas); if (novo !== original) { let prods = obterMateriais(); prods.forEach(p => { if(p.loja.toUpperCase() === original) p.loja = novo; }); salvarMateriaisNoBanco(prods); let hist = obterHistorico(); hist.forEach(h => { if(h.origem.toUpperCase() === original) h.origem = novo; if(h.destino.toUpperCase() === original) h.destino = novo; }); salvarHistoricoNoBanco(hist); } } else { if(lojas.find(l => l.nome === novo)) return alert('Local existe!'); lojas.unshift({ nome: novo, cidade: cidade, estado: estado, status: status }); salvarLojasNoBanco(lojas); } fecharModalLoja(); renderizarLojas(); if(original && original !== novo) alert("Local e vínculos atualizados."); }
+        function excluirLoja(nome) { const qtd = obterMateriais().filter(p => p.loja.toUpperCase() === nome.toUpperCase()).length; if (qtd > 0) return alert(`Transfira os ${qtd} itens primeiro.`); if (confirm(`Excluir ${nome}?`)) { let lojas = obterLojas().filter(l => l.nome !== nome); salvarLojasNoBanco(lojas); renderizarLojas(); } }
+
+        // ================= ABA: ESTOQUE (CONSOLIDADO GERAL) ================= //
+        function carregarOpcoesLojasEstoque() {
+            const select = document.getElementById('filtro-loja-estoque');
+            if(!select) return;
+            const valorAtual = select.value;
+            select.innerHTML = '<option value="TODAS">-- Todas as Lojas / Locais --</option>';
+            obterLojas().forEach(l => select.innerHTML += `<option value="${l.nome}">${l.nome}</option>`);
+            if(valorAtual) select.value = valorAtual;
+        }
+
+        // Função auxiliar que aplica o filtro para uso tanto na tela quanto nas exportações
+        function obterEstoqueConsolidadoFiltrado() {
+            const tbRaw = document.getElementById('busca-estoque').value.toLowerCase(); 
+            const filtroLoja = document.getElementById('filtro-loja-estoque').value;
+            let bens = obterMateriais(); 
+            
+            // 1. Filtra pela loja antes de somar as quantidades
+            if (filtroLoja !== "TODAS") {
+                bens = bens.filter(b => b.loja.toUpperCase() === filtroLoja.toUpperCase());
+            }
+
+            const map = {}; 
+            
+            // 2. Agrupa e soma as quantidades dos bens filtrados
+            bens.forEach(b => { 
+                const k = b.codigo.toUpperCase().trim(); 
+                if(!map[k]) map[k] = { codigo: b.codigo.toUpperCase(), descricao: b.descricao.toUpperCase().trim(), qtd: 0, obsProduto: b.obsProduto || "", und: b.und || "UN" }; 
+                map[k].qtd += b.qtd; 
+                if(b.obsProduto && !map[k].obsProduto.includes(b.obsProduto)) {
+                    map[k].obsProduto += (map[k].obsProduto ? " | " : "") + b.obsProduto;
+                }
+            }); 
+            
+            let lst = Object.values(map); 
+            
+            // 3. Aplica o filtro de texto
+            if(tbRaw.trim()) {
+                const termos = tbRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                lst = lst.filter(i => {
+                    return termos.some(termo => 
+                        i.descricao.toLowerCase().includes(termo) || 
+                        i.codigo.toLowerCase().includes(termo)
+                    );
+                }); 
+            }
+            return lst;
+        }
+
+        function buscarEstoque() { paginaAtualEstoque = 1; renderizarEstoque(); }
+        function mudarPaginaEstoque(page) { paginaAtualEstoque = page; renderizarEstoque(); }
+        
+        function renderizarEstoque() { 
+            const tbody = document.getElementById('tabela-estoque'); 
+            tbody.innerHTML = ''; 
+            
+            let lst = obterEstoqueConsolidadoFiltrado();
+            
+            const tPaginas = Math.ceil(lst.length / ITENS_POR_PAGINA) || 1; 
+            if(paginaAtualEstoque > tPaginas) paginaAtualEstoque = tPaginas; 
+            
+            document.getElementById('estoque-total-registros').innerText = `${lst.length} iten(s)`; 
+            document.getElementById('estoque-info-pagina').innerText = `Página ${paginaAtualEstoque} de ${tPaginas}`; 
+            
+            const p = lst.slice((paginaAtualEstoque - 1) * ITENS_POR_PAGINA, (paginaAtualEstoque - 1) * ITENS_POR_PAGINA + ITENS_POR_PAGINA); 
+            p.forEach(i => { 
+                let sb = i.qtd > 10 ? `<span class="bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1 rounded-full text-xs font-semibold">Em Estoque</span>` : `<span class="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 border border-yellow-200 dark:border-yellow-700/50 px-3 py-1 rounded-full text-xs font-semibold">Baixo</span>`; 
+                tbody.innerHTML += `<tr class="hover:bg-slate-50 dark:hover:bg-[#1e293b] transition-colors h-14"><td class="p-4 font-bold text-gray-800 dark:text-white">${i.codigo}</td><td class="p-4 text-gray-600 dark:text-slate-300">${i.descricao}</td><td class="p-4 text-center font-bold text-blue-600 dark:text-blue-400 text-lg">${i.qtd} <span class="text-xs text-gray-500 dark:text-slate-400 ml-1">${i.und || 'UN'}</span></td><td class="p-4">${sb}</td></tr>`; 
+            }); 
+            renderizarControlesPaginacao(tPaginas, paginaAtualEstoque, 'estoque-paginacao', 'mudarPaginaEstoque'); 
+        }
+
+        function exportarEstoqueCSV() { 
+            const consolidado = obterEstoqueConsolidadoFiltrado();
+            if (consolidado.length === 0) return alert("Sem dados na tela para exportar."); 
+            
+            let csv = "data:text/csv;charset=utf-8,\uFEFFCodigo;Descricao;Quantidade_Total;Observacao\n"; 
+            consolidado.forEach(b => csv += `${b.codigo};${b.descricao};${b.qtd} ${b.und || 'UN'};${b.obsProduto || ''}\n`); 
+            
+            const a = document.createElement("a"); a.setAttribute("href", encodeURI(csv)); a.setAttribute("download", "estoque_consolidado.csv"); document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+        }
+
+        function exportarEstoquePDF() {
+            const consolidado = obterEstoqueConsolidadoFiltrado();
+            if (consolidado.length === 0) return alert("Sem dados na tela para exportar."); 
+            
+            const tb = document.getElementById('busca-estoque').value.trim();
+            const lojaSelecionada = document.getElementById('filtro-loja-estoque').value;
+            
+            let titulo = lojaSelecionada === "TODAS" ? "Estoque Geral Consolidado" : `Estoque Consolidado - ${lojaSelecionada}`;
+            if (tb) titulo += ` (Filtro: "${tb}")`;
+
+            gerarPDF(consolidado, titulo, "estoque_consolidado.pdf", ["Código / SKU", "Item / Acessório", "Qtd. Total", "Status", "Observação"]);
+        }
+
+
+        // ================= ABA: LISTA DETALHADA DE MATERIAIS (COM FILTRO) ================= //
+        function carregarOpcoesLojasLista() {
+            const select = document.getElementById('filtro-loja-lista');
+            if(!select) return;
+            const valorAtual = select.value;
+            select.innerHTML = '<option value="TODAS">-- Todos os Locais --</option>';
+            obterLojas().forEach(l => select.innerHTML += `<option value="${l.nome}">${l.nome}</option>`);
+            if(valorAtual) select.value = valorAtual;
+        }
+
+        function obterListaFiltrada() {
+            let l = obterMateriais();
+            const filtroLoja = document.getElementById('filtro-loja-lista') ? document.getElementById('filtro-loja-lista').value : 'TODAS';
+            const tbRaw = document.getElementById('busca-produto-lista') ? document.getElementById('busca-produto-lista').value.toLowerCase().trim() : '';
+
+            if (filtroLoja !== 'TODAS') {
+                l = l.filter(m => m.loja.toUpperCase() === filtroLoja.toUpperCase());
+            }
+
+            if (tbRaw) {
+                const termos = tbRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                l = l.filter(m => {
+                    return termos.some(termo => 
+                        m.descricao.toLowerCase().includes(termo) || 
+                        m.codigo.toLowerCase().includes(termo)
+                    );
+                });
+            }
+            return l;
+        }
+
+        function mudarPaginaProdutos(page) { paginaAtualProdutos = page; carregarTabela(); }
+
+        function carregarTabela() {
+            let l = obterListaFiltrada();
+            const tb = document.getElementById('tabela-bens'); 
+            tb.innerHTML = ''; 
+
+            if(l.length === 0) {
+                document.getElementById('produtos-total-registros').innerText = "0 iten(s)"; 
+                document.getElementById('produtos-info-pagina').innerText = "Página 1 de 1"; 
+                document.getElementById('produtos-paginacao').innerHTML = "";
+                return tb.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500 dark:text-slate-500 text-sm">Nenhum item encontrado no estoque.</td></tr>';
+            }
+
+            const tPag = Math.ceil(l.length / ITENS_POR_PAGINA) || 1; 
+            if(paginaAtualProdutos > tPag) paginaAtualProdutos = tPag;
+            
+            document.getElementById('produtos-total-registros').innerText = `${l.length} registro(s) de estoque`; 
+            document.getElementById('produtos-info-pagina').innerText = `Página ${paginaAtualProdutos} de ${tPag}`;
+            
+            const pag = l.slice((paginaAtualProdutos - 1) * ITENS_POR_PAGINA, (paginaAtualProdutos - 1) * ITENS_POR_PAGINA + ITENS_POR_PAGINA);
+            
+            pag.forEach(bem => {
+                let btnQR = `<button onclick="abrirQRCode('${bem.codigo}', '${bem.descricao}')" class="text-blue-500 hover:text-blue-700 font-bold p-2 transition" title="Gerar QR Code"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg></button>`;
+                let btnEdit = `<button onclick="abrirModalEditarMaterial('${bem.codigo}')" class="text-indigo-500 hover:text-indigo-700 font-bold p-2 transition" title="Editar"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>`;
+                let btnExc = `<button onclick="excluirPatrimonio('${bem.codigo}', '${bem.loja}')" class="text-gray-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-500 font-bold p-2 transition" title="Excluir"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+                let chk = `<td class="p-4 text-center border-b border-gray-100 dark:border-slate-800"><input type="checkbox" class="chk-item cursor-pointer w-4 h-4 text-blue-600 rounded bg-white dark:bg-[#0f172a] border-gray-300 dark:border-slate-600 focus:ring-blue-500" value="${bem.codigo}|${bem.loja}"></td>`;
+                
+                tb.innerHTML += `<tr class="hover:bg-slate-50 dark:hover:bg-[#1e293b] border-b border-gray-100 dark:border-slate-800 transition-colors h-14">${chk}<td class="p-4 font-bold text-gray-800 dark:text-white max-w-[120px] truncate" title="${bem.codigo}">${bem.codigo}</td><td class="p-4 text-gray-600 dark:text-slate-300 max-w-[200px] truncate" title="${bem.descricao}">${bem.descricao}</td><td class="p-4 text-gray-600 dark:text-slate-300 max-w-[150px] truncate" title="${bem.loja}">${bem.loja}</td><td class="p-4 text-blue-600 dark:text-blue-400 font-bold text-center">${bem.qtd} <span class="text-[10px] text-gray-500 dark:text-slate-400 ml-1">${bem.und || 'UN'}</span></td><td class="p-4 text-center flex justify-center items-center gap-1">${btnQR}${btnEdit}${btnExc}</td></tr>`;
+            });
+            renderizarControlesPaginacao(tPag, paginaAtualProdutos, 'produtos-paginacao', 'mudarPaginaProdutos');
+        }
+
+        function exportarListaFiltradaCSV() {
+            const l = obterListaFiltrada();
+            if (l.length === 0) return alert("Sem dados na tela para exportar.");
+            let csv = "data:text/csv;charset=utf-8,\uFEFFCodigo;Descricao;Local;Quantidade;Observacao\n";
+            l.forEach(b => csv += `${b.codigo};${b.descricao};${b.loja};${b.qtd} ${b.und || 'UN'};${b.obsProduto || ''}\n`);
+            const a = document.createElement("a");
+            a.setAttribute("href", encodeURI(csv));
+            a.setAttribute("download", "lista_materiais_filtrada.csv");
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        function exportarListaFiltradaPDF() {
+            const l = obterListaFiltrada();
+            if (l.length === 0) return alert("Sem dados na tela para exportar.");
+            
+            const tb = document.getElementById('busca-produto-lista').value.trim();
+            const lojaSelecionada = document.getElementById('filtro-loja-lista').value;
+            
+            let titulo = lojaSelecionada === "TODAS" ? "Lista Geral de Materiais" : `Materiais - ${lojaSelecionada}`;
+            if (tb) titulo += ` (Filtro: "${tb}")`;
+
+            gerarPDF(l, titulo, "lista_materiais.pdf", ["Código / SKU", "Descrição do Item", "Local", "Quantidade", "Observação"]);
+        }
+
+        // ================= DEMAIS FUNÇÕES ================= //
+        function acionarImportacao() { document.getElementById('input-planilha').click(); }
+        
+        function processarPlanilha(e) {
+            const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+            r.onload = function(ev) {
+                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                let imp = 0, nov = 0; let lst = obterMateriais(); let lj = obterLojas(); const h = obterHistorico(); const d = new Date().toLocaleString('pt-BR');
+                
+                rows.forEach(row => {
+                    let cod = row['Código'] || row['SKU'] || ''; 
+                    let pr = row['Produto'] || row['Descrição'] || row['Item'] || ''; 
+                    let lc = row['Loja'] || row['Localização'] || row['Local'] || 'Sem Local'; 
+                    let q = parseInt(row['Quantidade'] || row['Qtd']) || 1;
+                    let obs = row['Observação'] || row['Obs'] || '';
+                    let ud = row['Und'] || row['Unidade'] || row['Medida'] || 'UN';
+                    
+                    if (!pr) return; 
+                    let pf = cod ? cod.toString().trim() : ("ITEM-" + Math.floor(10000 + Math.random() * 90000));
+                    
+                    if (!lj.find(l => l.nome.toLowerCase() === lc.toLowerCase().trim())) { 
+                        lj.push({ nome: lc.toUpperCase().trim(), cidade: "N/I", estado: "RS", status: "Ativa" }); nov++; 
+                    }
+                    
+                    let idx = lst.findIndex(m => m.codigo === pf && m.loja === lc.toUpperCase().trim());
+                    if(idx > -1) {
+                        lst[idx].qtd += q;
+                        if(obs) lst[idx].obsProduto = obs;
+                        lst[idx].und = ud.toString().toUpperCase();
+                    } else {
+                        lst.unshift({ codigo: pf, descricao: pr.toUpperCase(), loja: lc.toUpperCase().trim(), qtd: q, obsProduto: obs, und: ud.toString().toUpperCase() });
+                    }
+
+                    h.push({ data: d, codigo: pf, descricao: pr.toUpperCase(), qtd: q, origem: 'PLANILHA', destino: 'IMPORTADO', obs: 'Importação em Lote' }); imp++;
+                });
+
+                salvarMateriaisNoBanco(lst); salvarLojasNoBanco(lj); salvarHistoricoNoBanco(h); document.getElementById('input-planilha').value = '';
+                alert(`Concluido!\n✅ ${imp} itens processados.\n🏷️ ${nov} novo(s) local(is) criado(s).`); mostrarAba('lista', document.querySelectorAll('.menu-item')[1]);
+            }; r.readAsArrayBuffer(f);
+        }
+        
+        function excluirPatrimonio(cod, loja) { 
+            if (confirm(`Remover todo o estoque do item ${cod} no local ${loja}?`)) { 
+                let mat = obterMateriais().find(m => m.codigo === cod && m.loja === loja);
+                salvarMateriaisNoBanco(obterMateriais().filter(b => !(b.codigo === cod && b.loja === loja))); 
+                
+                const h = obterHistorico(); 
+                h.push({data: new Date().toLocaleString('pt-BR'), codigo: cod, descricao: mat.descricao, qtd: mat.qtd, origem: loja, destino: 'REGISTRO EXCLUÍDO', obs: `Excluído manualmente`}); 
+                salvarHistoricoNoBanco(h); 
+                
+                carregarTabela(); atualizarDashboard(); 
+            } 
+        }
+
+        function toggleTodos(src) { document.querySelectorAll('.chk-item').forEach(c => c.checked = src.checked); }
+        
+        function excluirSelecionados() { 
+            const sel = document.querySelectorAll('.chk-item:checked'); 
+            if (sel.length === 0) return; 
+            if (confirm(`Excluir ${sel.length} registros de itens?`)) { 
+                let l = obterMateriais(); const h = obterHistorico(); const d = new Date().toLocaleString('pt-BR'); 
+                sel.forEach(c => { 
+                    let [cod, loja] = c.value.split('|');
+                    let mat = l.find(m => m.codigo === cod && m.loja === loja);
+                    if(mat) {
+                        l = l.filter(b => !(b.codigo === cod && b.loja === loja)); 
+                        h.push({data: d, codigo: cod, descricao: mat.descricao, qtd: mat.qtd, origem: loja, destino: 'REGISTRO EXCLUÍDO', obs: `Exclusão em Lote`}); 
+                    }
+                }); 
+                salvarMateriaisNoBanco(l); salvarHistoricoNoBanco(h); 
+                document.getElementById('chk-todos').checked = false; carregarTabela(); atualizarDashboard(); 
+            } 
+        }
+
+        function exportarCSV() { 
+            const l = obterMateriais(); if (l.length === 0) return; 
+            let csv = "data:text/csv;charset=utf-8,\uFEFFCodigo;Descricao;Local;Quantidade;Observacao\n"; 
+            l.forEach(b => csv += `${b.codigo};${b.descricao};${b.loja};${b.qtd} ${b.und || 'UN'};${b.obsProduto || ''}\n`); 
+            const a = document.createElement("a"); a.setAttribute("href", encodeURI(csv)); a.setAttribute("download", "base_itens_geral.csv"); document.body.appendChild(a); a.click(); document.body.removeChild(a); 
+        }
+
+        function atualizarDashboard() {
+            const skusUnicos = new Set(obterMateriais().map(m => m.codigo));
+            document.getElementById('dash-total').innerText = skusUnicos.size;
+            document.getElementById('dash-lojas').innerText = obterLojas().length;
+        }
+
+        // ================= LÓGICA DE INSTALAÇÃO PWA =================
+        let deferredPrompt;
+        const btnInstallPWA = document.getElementById('btn-install-pwa');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (btnInstallPWA) {
+                btnInstallPWA.classList.remove('hidden');
+                btnInstallPWA.classList.add('flex');
+            }
+        });
+
+        if (btnInstallPWA) {
+            btnInstallPWA.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`Resultado da instalação: ${outcome}`);
+                    
+                    deferredPrompt = null;
+                    btnInstallPWA.classList.add('hidden');
+                    btnInstallPWA.classList.remove('flex');
+                }
+            });
+        }
+        
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            if (btnInstallPWA) {
+                btnInstallPWA.classList.add('hidden');
+                btnInstallPWA.classList.remove('flex');
+            }
+            console.log('A PWA foi instalada com sucesso.');
+        });
+
+    </script>
+</body>
+</html>
